@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>灰の決闘</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+</head>
+<body>
+<div id="app">
+  <section id="select">
+    <div class="hero">
+      <p class="eyebrow">プロトタイプ v0.1 ・ 1対1</p>
+      <h1>灰の決闘</h1>
+      <p>スタミナダイスを振り、出目を武器とカードに振り分ける決闘。攻めに使うか、相手の攻撃に備えて残すか。</p>
+    </div>
+    <div class="rules">
+      <p class="eyebrow">ラウンドの流れ</p>
+      <ol>
+        <li>スタミナダイスが3個回復する（上限は持久で決まる）</li>
+        <li>スタミナダイスを1個払えばカードを1枚引ける</li>
+        <li>速度（重量ごとにnd6）を振り、高い方が先手</li>
+        <li>手番開始時に、使う分のスタミナダイスをまとめて振る</li>
+        <li>攻撃されたら、残りを振って回避かガード</li>
+      </ol>
+    </div>
+    <p class="eyebrow">素性を選ぶ</p>
+    <div class="classes" id="classes"></div>
+    <p class="note" id="foeNote"></p>
+  </section>
+
+  <section id="battle" hidden>
+    <div class="panel" id="foePanel"></div>
+    <div id="log" aria-live="polite"></div>
+    <div class="panel" id="mePanel"></div>
+    <div class="tray">
+      <div class="tray-h"><span class="eyebrow">行動ダイス</span><span id="trayNote"></span></div>
+      <div class="dice" id="dice"></div>
+      <p class="hint" id="hint"></p>
+    </div>
+    <div class="actions" id="actions"></div>
+    <div class="hand-h"><span class="eyebrow">手札</span><span id="deckNote"></span></div>
+    <div class="hand" id="hand"></div>
+  </section>
+</div>
+<div id="modal" hidden></div>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

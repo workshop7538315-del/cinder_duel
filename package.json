@@ -1,0 +1,27 @@
+{
+  "name": "cinder-duel",
+  "version": "0.1.0",
+  "description": "ダイスとカードで戦う1対1の決闘ゲーム",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/workshop7538315-del/cinder_duel.git"
+  },
+  "bugs": {
+    "url": "https://github.com/workshop7538315-del/cinder_duel/issues"
+  },
+  "homepage": "https://github.com/workshop7538315-del/cinder_duel#readme",
+  "devDependencies": {
+    "typescript": "~5.6.3",
+    "vite": "~5.4.21",
+    "vitest": "~2.1.9"
+  },
+  "private": true,
+  "type": "module"
+}
