@@ -34,5 +34,8 @@ npm run build    # dist/ に書き出し
 
 ## 公開について
 
-`.github/workflows/deploy.yml` は GitHub Pages に載せるためのもの。手動実行にしてあるので、
-Settings → Pages で Source を「GitHub Actions」にしてから Actions タブで実行するまで公開されない。
+main に push すると `.github/workflows/deploy.yml` が GitHub Pages に公開する。
+
+https://workshop7538315-del.github.io/cinder_duel/
+
+初回だけ Settings → Pages で Source を「GitHub Actions」にしておく必要がある。

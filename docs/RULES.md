@@ -1,5 +1,7 @@
 # ルール（v0.1）
 
+プレイ: https://workshop7538315-del.github.io/cinder_duel/
+
 数値はすべて仮。`src/data/rules.ts` と各データで調整する。
 
 ## 能力値

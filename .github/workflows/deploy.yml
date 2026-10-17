@@ -1,6 +1,8 @@
 name: Deploy to GitHub Pages
-# 公開するまでは手動実行のみ（Settings → Pages で Source を GitHub Actions にしてから実行）
+# main に push するたびに公開する（Settings → Pages で Source を GitHub Actions にしておくこと）
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 permissions:
   contents: read
