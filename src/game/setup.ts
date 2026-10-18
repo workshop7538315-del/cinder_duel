@@ -1,19 +1,25 @@
-import { STARTER_DECK } from '../data/cards';
-import { SHIELDS, WEAPONS, WEIGHTS } from '../data/equipment';
+import { loadout, type Character } from '../character/model';
 import { shuffle } from '../engine/dice';
-import { derive } from '../engine/fighter';
-import type { Fighter, FighterDef } from '../engine/types';
+import type { Fighter } from '../engine/types';
 
-export function makeFighter(def: FighterDef, isPlayer: boolean): Fighter {
-  const d = derive(def.stats);
+export function makeFighter(c: Character, isPlayer: boolean): Fighter {
+  const lo = loadout(c);
+  const d = lo.derived;
   return {
-    name: def.name,
+    name: c.name,
+    level: lo.level,
     isPlayer,
-    stats: { ...def.stats },
-    weapon: WEAPONS[def.weapon],
-    shield: def.shield ? SHIELDS[def.shield] : null,
-    weight: WEIGHTS[def.weight],
-    ...d,
+    stats: lo.stats,
+    right: lo.right,
+    left: lo.left,
+    rightOk: lo.rightOk,
+    leftOk: lo.leftOk,
+    armorCut: lo.armorCut,
+    weight: lo.weightClass,
+    maxHp: d.maxHp,
+    maxFp: d.maxFp,
+    stInit: d.stInit,
+    stMax: d.stMax,
     hp: d.maxHp,
     fp: d.maxFp,
     stamina: 0,
@@ -21,7 +27,7 @@ export function makeFighter(def: FighterDef, isPlayer: boolean): Fighter {
     speedRoll: [],
     action: [],
     hand: [],
-    deck: isPlayer ? shuffle(STARTER_DECK.slice()) : [],
+    deck: shuffle([...c.deck]),
     discard: [],
     chain: 0,
     buffs: {},

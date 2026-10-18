@@ -1,10 +1,16 @@
 /** 能力値（エルデンリング準拠）。
- *  生命力=HP、精神=FP、持久=スタミナダイス。
- *  筋力・技量・知力・信仰・神秘はそれ自体に効果はなく、武器やカードの能力補正から参照される。 */
+ *  生命力=HP、精神=FP、持久=スタミナダイスと装備重量。
+ *  筋力・技量・知力・信仰・神秘はそれ自体に効果はなく、装備条件と能力補正から参照される。 */
 export type StatKey = 'vit' | 'att' | 'end' | 'str' | 'dex' | 'int' | 'fai' | 'arc';
 export type Stats = Record<StatKey, number>;
 export type ScaleStat = 'str' | 'dex' | 'int' | 'fai' | 'arc';
-export type DamageType = 'phys' | 'magic';
+export type Requirements = Partial<Record<ScaleStat, number>>;
+
+export type DamageType = 'phys' | 'magic' | 'holy';
+export type Cut = Record<DamageType, number>;
+
+/** 魔術（杖）と祈祷（聖印・タリスマン） */
+export type School = 'sorcery' | 'incant';
 
 /** 行動ダイスで払うコスト
  *  - sum : 合計 n 以上（お釣りなし）
@@ -27,15 +33,14 @@ export interface Die {
   fresh?: boolean;
 }
 
-export type WeightKey = 'light' | 'medium' | 'heavy';
+export type WeightKey = 'light' | 'medium' | 'heavy' | 'over';
 export interface WeightClass {
+  key: WeightKey;
   name: string;
   /** 速度 = nd6 の n */
   speedDice: number;
-  /** 回避に必要な合計 */
-  dodge: number;
-  /** 物理ダメージの固定軽減 */
-  armor: number;
+  /** 回避に必要な合計（null なら回避できない） */
+  dodge: number | null;
 }
 
 export interface WeaponArt {
@@ -47,8 +52,15 @@ export interface WeaponArt {
   unguardable?: boolean;
 }
 
-export interface Weapon {
+interface ItemBase {
   name: string;
+  weight: number;
+  req: Requirements;
+}
+
+/** 片手に持つ武器。触媒（杖・聖印・タリスマン）も武器として殴れる。 */
+export interface Weapon extends ItemBase {
+  kind: 'weapon' | 'catalyst';
   /** 一段目のコスト [first]、以降は inc ずつ重くなる */
   first: number;
   inc: number;
@@ -56,36 +68,49 @@ export interface Weapon {
   dmg: Scaling;
   type: DamageType;
   /** 受け能力（ガード時のカット率） */
-  cut: Record<DamageType, number>;
-  art: WeaponArt;
+  cut: Cut;
+  art?: WeaponArt;
+  /** 触媒のみ: 対応する系統と、魔術・祈祷に上乗せする威力 */
+  school?: School;
+  power?: Scaling;
 }
 
-export interface Shield {
-  name: string;
-  cut: Record<DamageType, number>;
+export interface Shield extends ItemBase {
+  kind: 'shield';
+  cut: Cut;
+  /** ガード消費を軽くする（大盾など） */
+  guardBonus?: number;
 }
 
-export interface FighterDef {
+export type HandItem = Weapon | Shield;
+
+export type ArmorSlot = 'head' | 'chest' | 'arms' | 'legs';
+export interface Armor {
   name: string;
-  blurb?: string;
-  weapon: string;
-  shield: string | null;
-  weight: WeightKey;
-  stats: Stats;
+  slot: ArmorSlot;
+  weight: number;
+  /** 被ダメージのカット率（部位の合計を使う） */
+  cut: Cut;
 }
 
 export interface Buffs {
-  oil?: boolean;
+  /** この手番の武器攻撃・戦技への加算 */
+  weaponBonus?: number;
   stance?: boolean;
   broken?: boolean;
 }
 
 export interface Fighter {
   name: string;
+  level: number;
   isPlayer: boolean;
   stats: Stats;
-  weapon: Weapon;
-  shield: Shield | null;
+  right: Weapon;
+  left: HandItem | null;
+  /** 装備条件を満たしているか */
+  rightOk: boolean;
+  leftOk: boolean;
+  armorCut: Cut;
   weight: WeightClass;
   maxHp: number;
   maxFp: number;

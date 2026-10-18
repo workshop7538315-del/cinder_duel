@@ -2,11 +2,10 @@ import { CARDS } from '../data/cards';
 import { RULES } from '../data/rules';
 import { findPayment, isValidPayment, stageCost } from '../engine/cost';
 import { rollDice, rollMany } from '../engine/dice';
-import { applyArmor, dodgeCost, drawCard, guardCost, guardCut, spend } from '../engine/fighter';
+import { applyArmor, catalystFor, dodgeCost, drawCard, guardCost, guardCut, spend, weaponDamage } from '../engine/fighter';
 import { costLabel, typeName } from '../engine/format';
-import { scaled } from '../engine/scaling';
 import type { Attack, Cost, Die, Fighter } from '../engine/types';
-import { npcReactChoice, npcReactDice, npcTurn } from './ai';
+import { npcDraws, npcReactChoice, npcReactDice, npcTurn } from './ai';
 
 export type Reaction = 'dodge' | 'guard' | 'take';
 export type LogKind = 'round' | 'sys' | 'me' | 'foe' | 'hit' | 'guard' | 'dodge';
@@ -16,7 +15,8 @@ export interface IncomingHit {
   attacker: Fighter;
   attack: Attack;
   raw: number;
-  dodgeCost: number;
+  /** null なら回避できない（過重） */
+  dodgeCost: number | null;
   guardCost: number;
   guardCut: number;
   guardDmg: number;
@@ -37,6 +37,15 @@ export interface BattleIO {
   finished(playerWon: boolean): void;
 }
 
+/** カードが今使えない理由（使えるなら null） */
+export function cardUnusable(f: Fighter, id: string): string | null {
+  const c = CARDS[id];
+  if (!c) return '不明なカードです。';
+  if (c.fp && f.fp < c.fp) return 'FPが足りません。';
+  if (c.school && !catalystFor(f, c.school)) return c.school === 'sorcery' ? '杖を持っていません。' : '聖印かタリスマンを持っていません。';
+  return null;
+}
+
 export class Battle {
   round = 0;
   phase: Phase = 'wait';
@@ -50,7 +59,10 @@ export class Battle {
     readonly e: Fighter,
     private io: BattleIO,
   ) {
-    for (let i = 0; i < RULES.handStart; i++) drawCard(p);
+    for (let i = 0; i < RULES.handStart; i++) {
+      drawCard(p);
+      drawCard(e);
+    }
   }
 
   get over(): boolean {
@@ -78,7 +90,7 @@ export class Battle {
   /* ---------------- 進行 ---------------- */
 
   async run(): Promise<void> {
-    this.log(`${this.e.name}が立ちはだかる。`);
+    this.log(`${this.e.name}（Lv${this.e.level}）が立ちはだかる。`);
     while (!this.over) {
       this.round++;
       for (const f of [this.p, this.e]) {
@@ -107,13 +119,21 @@ export class Battle {
     }
   }
 
+  private canDraw(f: Fighter): boolean {
+    return f.stamina >= RULES.drawCost && f.deck.length + f.discard.length > 0;
+  }
+
   private async drawPhase(): Promise<void> {
-    const p = this.p;
-    if (p.stamina < RULES.drawCost || !(p.deck.length + p.discard.length)) return;
-    if (!(await this.io.askDraw())) return;
-    p.stamina -= RULES.drawCost;
-    const c = drawCard(p);
-    if (c) this.log(`スタミナダイスを${RULES.drawCost}個払い「${CARDS[c].name}」を引いた。`, 'me');
+    const { p, e } = this;
+    if (this.canDraw(p) && (await this.io.askDraw())) {
+      p.stamina -= RULES.drawCost;
+      const c = drawCard(p);
+      if (c) this.log(`スタミナダイスを${RULES.drawCost}個払い「${CARDS[c].name}」を引いた。`, 'me');
+    }
+    if (this.canDraw(e) && npcDraws(e)) {
+      e.stamina -= RULES.drawCost;
+      if (drawCard(e)) this.log(`${e.name}はスタミナダイスを${RULES.drawCost}個払い、カードを引いた。`, 'foe');
+    }
     this.update();
   }
 
@@ -126,7 +146,7 @@ export class Battle {
     else await npcTurn(this, f, o);
     f.action = [];
     f.chain = 0;
-    f.buffs.oil = false;
+    f.buffs.weaponBonus = 0;
     this.turn = null;
     if (!this.over) {
       this.phase = 'wait';
@@ -154,12 +174,39 @@ export class Battle {
     if (k) this.log(`${this.who(f)}はスタミナダイスを${k}個振った：${f.action.map((d) => d.v).join('・')}`, this.side(f));
   }
 
+  /* ---------------- 行動（プレイヤーとNPCで共通） ---------------- */
+
+  async weaponAttack(f: Fighter, o: Fighter): Promise<void> {
+    const w = f.right;
+    f.chain++;
+    await this.strike(f, o, { label: `${w.name}・${f.chain}段目`, dmg: weaponDamage(f, w.dmg), type: w.type, weapon: true });
+  }
+
+  async weaponArt(f: Fighter, o: Fighter): Promise<void> {
+    const a = f.right.art;
+    if (!a) return;
+    f.fp -= a.fp;
+    f.chain = 0;
+    await this.strike(f, o, { label: a.name, dmg: weaponDamage(f, a.dmg), type: a.type, weapon: true, unguardable: a.unguardable });
+  }
+
+  async playCard(f: Fighter, o: Fighter, index: number, pay: Die[]): Promise<void> {
+    const id = f.hand[index];
+    const c = CARDS[id];
+    if (c.fp) f.fp -= c.fp;
+    f.hand.splice(index, 1);
+    f.discard.push(id);
+    f.chain = 0;
+    this.log(`${f.isPlayer ? '' : f.name + 'は'}「${c.name}」を使った（${pay.map((d) => d.v).join('・')}）。`, this.side(f));
+    this.update();
+    await c.run(this, f, o);
+  }
+
   /* ---------------- 攻撃とリアクション ---------------- */
 
   async strike(att: Fighter, def: Fighter, atk: Attack): Promise<void> {
     if (this.over) return;
-    let raw = atk.dmg + (atk.weapon && att.buffs.oil ? RULES.oilBonus : 0);
-    raw = applyArmor(def, atk.type, raw);
+    const raw = applyArmor(def, atk.type, atk.dmg + (atk.weapon ? att.buffs.weaponBonus ?? 0 : 0));
     this.log(`${this.who(att)}の${atk.label}！ ${typeName(atk.type)}${raw}${atk.unguardable ? '・ガード不可' : ''}`, this.side(att));
     this.update();
     await this.wait(att.isPlayer ? 250 : 550);
@@ -195,7 +242,7 @@ export class Battle {
     if (k <= 0) return 'take';
     this.rollAction(def, k);
     this.update();
-    const canDodge = !!findPayment(def.action, { t: 'sum', n: hit.dodgeCost });
+    const canDodge = hit.dodgeCost !== null && !!findPayment(def.action, { t: 'sum', n: hit.dodgeCost });
     const canGuard = !hit.attack.unguardable && !!findPayment(def.action, { t: 'sum', n: hit.guardCost });
     let r: Reaction;
     if (def.isPlayer) r = await this.io.askReactChoice(hit, def.action, canDodge, canGuard);
@@ -234,9 +281,9 @@ export class Battle {
     return this.canAct() && this.p.fp >= fp && !!findPayment(this.p.action, cost);
   }
   /** 次の段の武器攻撃コスト（連撃上限なら null） */
-  weaponCost(): Cost | null {
-    const w = this.p.weapon;
-    return this.p.chain >= w.maxChain ? null : stageCost(w, this.p.chain);
+  weaponCost(f: Fighter = this.p): Cost | null {
+    const w = f.right;
+    return f.chain >= w.maxChain ? null : stageCost(w, f.chain);
   }
 
   /** 選んだダイス（未選択なら自動）で払う。失敗時はメッセージを返す。 */
@@ -269,52 +316,47 @@ export class Battle {
 
   useWeapon(selected: number[]): Promise<string | null> {
     return this.command(async () => {
-      const p = this.p;
-      const w = p.weapon;
       const c = this.weaponCost();
       if (!c) return '連撃はここまでです。';
       const pay = this.pay(c, selected);
       if (typeof pay === 'string') return pay;
-      p.chain++;
-      await this.strike(p, this.e, { label: `${w.name}・${p.chain}段目`, dmg: scaled(w.dmg, p.stats), type: w.type, weapon: true });
+      await this.weaponAttack(this.p, this.e);
       return null;
     });
   }
 
   useArt(selected: number[]): Promise<string | null> {
     return this.command(async () => {
-      const p = this.p;
-      const a = p.weapon.art;
-      if (p.fp < a.fp) return 'FPが足りません。';
+      const a = this.p.right.art;
+      if (!a) return 'この武器には戦技がありません。';
+      if (this.p.fp < a.fp) return 'FPが足りません。';
       const pay = this.pay(a.cost, selected);
       if (typeof pay === 'string') return pay;
-      p.fp -= a.fp;
-      p.chain = 0;
-      await this.strike(p, this.e, {
-        label: a.name, dmg: scaled(a.dmg, p.stats), type: a.type, weapon: true, unguardable: a.unguardable,
-      });
+      await this.weaponArt(this.p, this.e);
       return null;
     });
   }
 
   useCard(index: number, selected: number[]): Promise<string | null> {
     return this.command(async () => {
-      const p = this.p;
-      const id = p.hand[index];
-      const c = CARDS[id];
-      if (!c) return null;
-      if (c.fp && p.fp < c.fp) return 'FPが足りません。';
-      const pay = this.pay(c.cost, selected);
+      const id = this.p.hand[index];
+      const why = cardUnusable(this.p, id);
+      if (why) return why;
+      const pay = this.pay(CARDS[id].cost, selected);
       if (typeof pay === 'string') return pay;
-      if (c.fp) p.fp -= c.fp;
-      p.hand.splice(index, 1);
-      p.discard.push(id);
-      p.chain = 0;
-      this.log(`「${c.name}」を使った（${pay.map((d) => d.v).join('・')}）。`, 'me');
-      this.update();
-      await c.run(this, p, this.e);
+      await this.playCard(this.p, this.e, index, pay);
       return null;
     });
+  }
+
+  /** 自分の手番中だけ降参できる。成功したら true */
+  surrender(): boolean {
+    if (!this.canAct()) return false;
+    this.phase = 'over';
+    this.winner = this.e;
+    this.log('あなたは降参した。', 'round');
+    this.endTurnResolve?.();
+    return true;
   }
 
   endTurn(): void {
