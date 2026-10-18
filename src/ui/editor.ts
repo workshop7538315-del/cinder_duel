@@ -45,7 +45,11 @@ function handDetail(item: HandItem | null, stats: Stats): string {
   if (item.kind !== 'shield') {
     parts.push(`${typeName(item.type)}${scaled(item.dmg, stats)}（${scaleLabel(item.dmg)}）`, `[${item.first}]+[${item.inc}]×${item.maxChain}段`);
     if (item.bleed) parts.push(`出血${scaled(item.bleed, stats)}（${scaleLabel(item.bleed)}）`);
-    if (item.art) parts.push(`戦技「${item.art.name}」${costLabel(item.art.cost, item.art.fp)}${item.art.bleed ? '・出血あり' : ''}`);
+    if (item.art) {
+      const r = item.art.reaction;
+      parts.push(`戦技「${item.art.name}」${costLabel(item.art.cost, item.art.fp)}${item.art.bleed ? '・出血あり' : ''}${r ? `（回避として使い、反撃${costLabel(r.counterCost)}）` : ''}`);
+    }
+    if (item.noEnchant) parts.push('エンチャント不可');
     if (item.kind === 'catalyst' && item.power) parts.push(`${item.school === 'sorcery' ? '魔術' : '祈祷'}の触媒（${scaleLabel(item.power)}）`);
   }
   parts.push(`受け 物理${pct(item.cut.phys)}・魔力${pct(item.cut.magic)}・聖${pct(item.cut.holy)}`);
@@ -128,7 +132,7 @@ function render(): void {
   const counts = countCards(c.deck);
   const cardRows = Object.entries(CARDS).map(([id, card]) => {
     const n = counts[id] ?? 0;
-    const block = cardBlock(id, stats, lo.schools);
+    const block = cardBlock(id, stats, lo.schools, lo.right);
     const canAdd = !block && n < RULES.copyLimit && c.deck.length < RULES.deckMax;
     return `<div class="dk-row ${block ? 'blocked' : ''} ${n ? 'in' : ''}">
       <div class="dk-main"><span class="dk-kind">${card.kind}</span><b>${card.name}</b> <span class="dk-cost">${costLabel(card.cost, card.fp)}</span>
@@ -210,7 +214,7 @@ function onClick(ev: Event): void {
   if (dk) {
     if (dk.dataset.deck === 'auto') {
       const lo = loadout(c);
-      c.deck = autoDeck(lo.stats, lo.schools);
+      c.deck = autoDeck(lo.stats, lo.schools, lo.right);
     } else c.deck = [];
     return render();
   }

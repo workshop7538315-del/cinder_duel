@@ -14,6 +14,9 @@ export function weaponBleed(f: Fighter, s: Scaling | undefined): number {
   return f.rightOk ? scaled(s, f.stats) : Math.floor(s.base * RULES.reqPenalty);
 }
 
+export const enchantBonus = (f: Fighter): number => f.buffs.enchant?.bonus ?? 0;
+export const enchantBleed = (f: Fighter): number => f.buffs.enchant?.bleed ?? 0;
+
 /** 出血を溜める。弾けたらそのダメージを返す（弾けなければ 0） */
 export function addBleed(f: Fighter, amount: number): number {
   if (amount <= 0) return 0;

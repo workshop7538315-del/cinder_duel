@@ -3,13 +3,14 @@ import { RULES } from '../data/rules';
 import { findPayment, isValidPayment, stageCost } from '../engine/cost';
 import { rollDice, rollMany } from '../engine/dice';
 import {
-  addBleed, applyArmor, catalystFor, dodgeCost, drawCard, guardCost, guardCut, spend, weaponBleed, weaponDamage,
+  addBleed, applyArmor, catalystFor, dodgeCost, drawCard, enchantBleed, enchantBonus, guardCost, guardCut, spend,
+  weaponBleed, weaponDamage,
 } from '../engine/fighter';
 import { costLabel, typeName } from '../engine/format';
-import type { Attack, Cost, Die, Fighter } from '../engine/types';
+import type { Attack, Cost, Die, Fighter, WeaponArt } from '../engine/types';
 import { npcDraws, npcReactChoice, npcReactDice, npcTurn } from './ai';
 
-export type Reaction = 'dodge' | 'guard' | 'take';
+export type Reaction = 'dodge' | 'guard' | 'take' | 'art';
 export type LogKind = 'round' | 'sys' | 'me' | 'foe' | 'hit' | 'guard' | 'dodge';
 export type Phase = 'wait' | 'act' | 'over';
 
@@ -22,6 +23,16 @@ export interface IncomingHit {
   guardCost: number;
   guardCut: number;
   guardDmg: number;
+  /** リアクション用の戦技（王朝鉈技など）。FPが足りないか持っていなければ null */
+  art: WeaponArt | null;
+}
+
+/** リアクション戦技で回避したあとの反撃の構え */
+export interface CounterInfo {
+  owner: Fighter;
+  target: Fighter;
+  art: WeaponArt;
+  cost: Cost;
 }
 
 /** 画面側が実装する入出力。Battle は DOM を知らない。 */
@@ -35,7 +46,9 @@ export interface BattleIO {
   askTurnDice(max: number, suggested: number): Promise<number>;
   /** リアクションで振る個数（0 = 振らずに受ける。max が 0 なら受けるしかない） */
   askReactDice(hit: IncomingHit, max: number): Promise<number>;
-  askReactChoice(hit: IncomingHit, dice: Die[], canDodge: boolean, canGuard: boolean): Promise<Reaction>;
+  askReactChoice(hit: IncomingHit, dice: Die[], canDodge: boolean, canGuard: boolean, canArt: boolean): Promise<Reaction>;
+  /** 反撃の好機に振る個数（0 = 見送る） */
+  askCounter(info: CounterInfo, max: number): Promise<number>;
   finished(playerWon: boolean): void;
 }
 
@@ -44,6 +57,7 @@ export function cardUnusable(f: Fighter, id: string): string | null {
   const c = CARDS[id];
   if (!c) return '不明なカードです。';
   if (c.fp && f.fp < c.fp) return 'FPが足りません。';
+  if (c.enchant && f.right.noEnchant) return `${f.right.name}にはエンチャントできません。`;
   if (c.school && !catalystFor(f, c.school)) return c.school === 'sorcery' ? '杖を持っていません。' : '聖印かタリスマンを持っていません。';
   return null;
 }
@@ -55,6 +69,8 @@ export class Battle {
   turn: Fighter | null = null;
   winner: Fighter | null = null;
   private endTurnResolve: (() => void) | null = null;
+  /** 反撃の構え（相手が次に攻撃以外をしたら反撃できる） */
+  counter: CounterInfo | null = null;
 
   constructor(
     readonly p: Fighter,
@@ -147,10 +163,12 @@ export class Battle {
     this.update();
     if (f.isPlayer) await this.playerTurn();
     else await npcTurn(this, f, o);
+    // 手番を終えるのも「攻撃以外」なので、反撃の構えがあれば反撃される
+    await this.afterAction(f, false);
+    this.counter = null;
     f.action = [];
     f.chain = 0;
-    f.buffs.weaponBonus = 0;
-    f.buffs.weaponBleed = 0;
+    f.buffs.enchant = undefined;
     this.turn = null;
     if (!this.over) {
       this.phase = 'wait';
@@ -180,7 +198,56 @@ export class Battle {
 
   /* ---------------- 行動（プレイヤーとNPCで共通） ---------------- */
 
+  /** 行動のあと。反撃の構えを取られていて、攻撃以外をしたなら反撃が来る */
+  private async afterAction(f: Fighter, isAttack: boolean): Promise<void> {
+    const c = this.counter;
+    if (!c || c.target !== f || this.over) return;
+    this.counter = null;
+    if (!isAttack) await this.resolveCounter(c);
+  }
+
+  private async resolveCounter(c: CounterInfo): Promise<void> {
+    const { owner, target, art } = c;
+    this.log(`${this.who(target)}の隙に、${this.who(owner)}は反撃を狙う。`, this.side(owner));
+    if (owner.stamina === 0) {
+      this.log(`スタミナダイスがなく、反撃できなかった。`);
+      return;
+    }
+    const k = owner.isPlayer ? await this.io.askCounter(c, owner.stamina) : Math.min(owner.stamina, 3);
+    if (k <= 0) {
+      this.log(`${this.who(owner)}は反撃を見送った。`);
+      return;
+    }
+    this.rollAction(owner, k);
+    this.update();
+    const pay = findPayment(owner.action, c.cost);
+    owner.action = [];
+    if (!pay) {
+      this.log(`出目が足りず、反撃できなかった。`);
+      this.update();
+      return;
+    }
+    await this.strike(owner, target, {
+      label: `${art.name}・反撃`, dmg: weaponDamage(owner, art.dmg), type: art.type, weapon: true, noReaction: true,
+      bleed: weaponBleed(owner, art.bleed),
+    });
+  }
+
+  /** 王朝鉈技などのリアクション戦技を使える状態か（FPと戦技の有無） */
+  reactionArt(f: Fighter): WeaponArt | null {
+    const a = f.right.art;
+    return a?.reaction && f.fp >= a.fp ? a : null;
+  }
+
+  /** エンチャントを掛ける（重ね掛けはできず、前のものは消える） */
+  enchant(f: Fighter, name: string, e: { bonus?: number; bleed?: number }): void {
+    const prev = f.buffs.enchant;
+    f.buffs.enchant = { name, bonus: e.bonus ?? 0, bleed: e.bleed ?? 0 };
+    this.log(`${prev ? `「${prev.name}」が消え、` : ''}武器に「${name}」を掛けた。`, this.side(f));
+  }
+
   async weaponAttack(f: Fighter, o: Fighter): Promise<void> {
+    await this.afterAction(f, true);
     const w = f.right;
     f.chain++;
     await this.strike(f, o, {
@@ -190,7 +257,8 @@ export class Battle {
 
   async weaponArt(f: Fighter, o: Fighter): Promise<void> {
     const a = f.right.art;
-    if (!a) return;
+    if (!a || a.reaction) return;
+    await this.afterAction(f, true);
     f.fp -= a.fp;
     f.chain = 0;
     await this.strike(f, o, {
@@ -207,14 +275,17 @@ export class Battle {
     f.chain = 0;
     this.log(`${f.isPlayer ? '' : f.name + 'は'}「${c.name}」を使った（${pay.map((d) => d.v).join('・')}）。`, this.side(f));
     this.update();
+    const isAttack = c.role === 'attack';
+    if (isAttack) await this.afterAction(f, true);
     await c.run(this, f, o);
+    if (!isAttack) await this.afterAction(f, false);
   }
 
   /* ---------------- 攻撃とリアクション ---------------- */
 
   async strike(att: Fighter, def: Fighter, atk: Attack): Promise<void> {
     if (this.over) return;
-    const raw = applyArmor(def, atk.type, atk.dmg + (atk.weapon ? att.buffs.weaponBonus ?? 0 : 0));
+    const raw = applyArmor(def, atk.type, atk.dmg + (atk.weapon ? enchantBonus(att) : 0));
     this.log(`${this.who(att)}の${atk.label}！ ${typeName(atk.type)}${raw}${atk.unguardable ? '・ガード不可' : ''}`, this.side(att));
     this.update();
     await this.wait(att.isPlayer ? 250 : 550);
@@ -226,9 +297,14 @@ export class Battle {
       guardCost: guardCost(def, raw),
       guardCut: cut,
       guardDmg: Math.round(raw * (1 - cut)),
+      art: this.reactionArt(def),
     };
-    const r = await this.react(def, hit);
-    if (r === 'dodge') {
+    const r = atk.noReaction ? 'take' : await this.react(def, hit);
+    if (r === 'art' && hit.art) {
+      def.fp -= hit.art.fp;
+      this.counter = { owner: def, target: att, art: hit.art, cost: hit.art.reaction!.counterCost };
+      this.log(`${this.who(def)}は「${hit.art.name}」でかわし、反撃の構えを取った。`, 'dodge');
+    } else if (r === 'dodge') {
       this.log(`${this.who(def)}は回避した。`, 'dodge');
     } else {
       const dmg = r === 'guard' ? hit.guardDmg : raw;
@@ -244,7 +320,7 @@ export class Battle {
 
   /** 当たった攻撃の出血を溜め、弾けたらダメージ */
   private applyBleed(att: Fighter, def: Fighter, atk: Attack, guarded: boolean): void {
-    let amount = (atk.bleed ?? 0) + (atk.weapon ? att.buffs.weaponBleed ?? 0 : 0);
+    let amount = (atk.bleed ?? 0) + (atk.weapon ? enchantBleed(att) : 0);
     if (guarded) amount = Math.floor(amount * RULES.bleedGuardRatio);
     if (amount <= 0 || def.hp <= 0) return;
     const burst = addBleed(def, amount);
@@ -268,11 +344,12 @@ export class Battle {
     this.update();
     const canDodge = hit.dodgeCost !== null && !!findPayment(def.action, { t: 'sum', n: hit.dodgeCost });
     const canGuard = !hit.attack.unguardable && !!findPayment(def.action, { t: 'sum', n: hit.guardCost });
+    const canArt = !!hit.art && !!findPayment(def.action, hit.art.cost);
     let r: Reaction;
-    if (def.isPlayer) r = await this.io.askReactChoice(hit, def.action, canDodge, canGuard);
+    if (def.isPlayer) r = await this.io.askReactChoice(hit, def.action, canDodge, canGuard, canArt);
     else {
       await this.wait(600);
-      r = npcReactChoice(canDodge, canGuard);
+      r = npcReactChoice(canDodge, canGuard, canArt);
     }
     // 使わなかった分も含め、リアクションの行動ダイスは消える
     def.action = [];
@@ -353,6 +430,7 @@ export class Battle {
     return this.command(async () => {
       const a = this.p.right.art;
       if (!a) return 'この武器には戦技がありません。';
+      if (a.reaction) return `「${a.name}」は攻撃されたときに使う戦技です。`;
       if (this.p.fp < a.fp) return 'FPが足りません。';
       const pay = this.pay(a.cost, selected);
       if (typeof pay === 'string') return pay;
