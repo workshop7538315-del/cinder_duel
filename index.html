@@ -10,25 +10,48 @@
 </head>
 <body>
 <div id="app">
-  <section id="select">
+  <section id="home">
     <div class="hero">
-      <p class="eyebrow">プロトタイプ v0.1 ・ 1対1</p>
+      <p class="eyebrow">v0.2 ・ 1対1</p>
       <h1>灰の決闘</h1>
       <p>スタミナダイスを振り、出目を武器とカードに振り分ける決闘。攻めに使うか、相手の攻撃に備えて残すか。</p>
     </div>
-    <div class="rules">
-      <p class="eyebrow">ラウンドの流れ</p>
+    <div class="sec-h"><p class="eyebrow">キャラクター</p><button type="button" class="btn primary" id="newChar">新しく作る</button></div>
+    <div class="char-list" id="charList"></div>
+    <details class="rules">
+      <summary>ラウンドの流れ</summary>
       <ol>
         <li>スタミナダイスが3個回復する（上限は持久で決まる）</li>
         <li>スタミナダイスを1個払えばカードを1枚引ける</li>
-        <li>速度（重量ごとにnd6）を振り、高い方が先手</li>
+        <li>速度（装備の重さごとにnd6）を振り、高い方が先手</li>
         <li>手番開始時に、使う分のスタミナダイスをまとめて振る</li>
         <li>攻撃されたら、残りを振って回避かガード</li>
       </ol>
+    </details>
+    <div class="data-box">
+      <p class="eyebrow">セーブデータ</p>
+      <p class="note">キャラクターはこのブラウザに自動で保存されます。別の端末やブラウザに移すときは、書き出したファイルを向こうで読み込んでください。</p>
+      <div class="row-btns">
+        <button type="button" class="btn" id="exportBtn">書き出す</button>
+        <label class="btn" for="importFile">読み込む</label>
+        <input type="file" id="importFile" accept="application/json,.json" hidden>
+      </div>
+      <p class="note" id="dataMsg" role="status"></p>
     </div>
-    <p class="eyebrow">素性を選ぶ</p>
-    <div class="classes" id="classes"></div>
-    <p class="note" id="foeNote"></p>
+  </section>
+
+  <section id="editor" hidden>
+    <div class="topbar"><button type="button" class="btn" id="edBack">← 保存せずに戻る</button></div>
+    <h1 class="page-h" id="edTitle">キャラクターを作る</h1>
+    <div class="name-row"><label for="edName">名前</label><input id="edName" maxlength="24" autocomplete="off"></div>
+    <div id="edBody"></div>
+    <div class="save-bar"><button type="button" class="btn primary big" id="edSave">保存する</button><p class="note" id="edSaveNote"></p></div>
+  </section>
+
+  <section id="versus" hidden>
+    <div class="topbar"><button type="button" class="btn" id="vsBack">← 一覧へ</button></div>
+    <h1 class="page-h">対戦相手を選ぶ</h1>
+    <div id="vsBody"></div>
   </section>
 
   <section id="battle" hidden>
@@ -43,6 +66,7 @@
     <div class="actions" id="actions"></div>
     <div class="hand-h"><span class="eyebrow">手札</span><span id="deckNote"></span></div>
     <div class="hand" id="hand"></div>
+    <button type="button" class="btn quiet" id="surrender">降参する</button>
   </section>
 </div>
 <div id="modal" hidden></div>

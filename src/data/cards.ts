@@ -1,34 +1,51 @@
+import { spellPower, weaponDamage } from '../engine/fighter';
 import { scaleLabel, scaled } from '../engine/scaling';
-import type { Cost, Fighter, Scaling } from '../engine/types';
+import type { Cost, Fighter, Requirements, Scaling, School } from '../engine/types';
 import type { Battle } from '../game/battle';
 import { RULES } from './rules';
 
+export type CardKind = 'アイテム' | '技' | '魔術' | '祈祷';
+
 export interface CardDef {
   name: string;
-  kind: 'アイテム' | '技' | '魔術' | '奇跡';
+  kind: CardKind;
   cost: Cost;
   fp?: number;
-  text: (user: Fighter) => string;
+  /** デッキに入れるのに必要な能力値 */
+  req?: Requirements;
+  /** 魔術・祈祷は対応する触媒が必要 */
+  school?: School;
+  /** NPCの判断用 */
+  role: 'attack' | 'heal' | 'buff' | 'utility';
+  text: (user: Fighter | null) => string;
   run: (b: Battle, user: Fighter, foe: Fighter) => Promise<void> | void;
 }
 
-const KNIFE: Scaling = { base: 5, scale: { dex: 0.2 } };
-const ARROW: Scaling = { base: 6, scale: { int: 0.6 } };
-const MEND: Scaling = { base: 6, scale: { fai: 1.0 } };
+const KNIFE: Scaling = { base: 6, scale: { dex: 0.3 } };
+const TACKLE: Scaling = { base: 6, scale: { str: 0.5 } };
+const BLOOD: Scaling = { base: 6, scale: { arc: 0.6 } };
+
+/** 魔術・祈祷の威力 = 基礎値 + 触媒の威力 × 倍率 */
+const spell = (f: Fighter | null, school: School, base: number, mult = 1): number | null => {
+  if (!f) return null;
+  const p = spellPower(f, school);
+  return p === null ? null : base + Math.floor(p * mult);
+};
+const num = (v: number | null, fallback: string) => (v === null ? fallback : String(v));
 
 export const CARDS: Record<string, CardDef> = {
   flask: {
-    name: '灰瓶', kind: 'アイテム', cost: { t: 'sum', n: 2 },
-    text: () => 'HPを14回復する。',
-    run: (b, f) => b.heal(f, 14),
+    name: '灰瓶', kind: 'アイテム', role: 'heal', cost: { t: 'sum', n: 2 },
+    text: () => `最大HPの${RULES.flaskRatio * 100}%を回復する。`,
+    run: (b, f) => b.heal(f, Math.round(f.maxHp * RULES.flaskRatio)),
   },
   knife: {
-    name: '投げナイフ', kind: 'アイテム', cost: { t: 'sum', n: 2 },
-    text: (f) => `物理${scaled(KNIFE, f.stats)}の攻撃。${scaleLabel(KNIFE)}`,
+    name: '投げナイフ', kind: 'アイテム', role: 'attack', cost: { t: 'sum', n: 2 }, req: { dex: 9 },
+    text: (f) => `物理${f ? scaled(KNIFE, f.stats) : KNIFE.base}の攻撃。${scaleLabel(KNIFE)}`,
     run: (b, f, o) => b.strike(f, o, { label: '投げナイフ', dmg: scaled(KNIFE, f.stats), type: 'phys' }),
   },
   kick: {
-    name: '蹴り', kind: '技', cost: { t: 'face', f: [1] },
+    name: '蹴り', kind: '技', role: 'attack', cost: { t: 'face', f: [1] },
     text: () => `物理3。当たると相手はこのラウンドの間、ガード消費+${RULES.kickBreak}。`,
     run: (b, f, o) =>
       b.strike(f, o, {
@@ -39,18 +56,46 @@ export const CARDS: Record<string, CardDef> = {
         },
       }),
   },
+  tackle: {
+    name: '体当たり', kind: '技', role: 'attack', cost: { t: 'sum', n: 4 }, req: { str: 16 },
+    text: (f) => `物理${f ? scaled(TACKLE, f.stats) : TACKLE.base}の攻撃。${scaleLabel(TACKLE)}`,
+    run: (b, f, o) => b.strike(f, o, { label: '体当たり', dmg: scaled(TACKLE, f.stats), type: 'phys' }),
+  },
+  bloodblade: {
+    name: '血の刃', kind: '技', role: 'attack', cost: { t: 'face', f: [2, 4, 6] }, fp: 2, req: { arc: 14 },
+    text: (f) => `物理${f ? scaled(BLOOD, f.stats) : BLOOD.base}の攻撃。ガードできない。${scaleLabel(BLOOD)}`,
+    run: (b, f, o) => b.strike(f, o, { label: '血の刃', dmg: scaled(BLOOD, f.stats), type: 'phys', unguardable: true }),
+  },
   arrow: {
-    name: '灰の矢', kind: '魔術', cost: { t: 'face', f: [2, 4, 6] }, fp: 2,
-    text: (f) => `魔法${scaled(ARROW, f.stats)}の攻撃。盾でも防ぎにくい。${scaleLabel(ARROW)}`,
-    run: (b, f, o) => b.strike(f, o, { label: '灰の矢', dmg: scaled(ARROW, f.stats), type: 'magic' }),
+    name: '灰の矢', kind: '魔術', role: 'attack', school: 'sorcery', cost: { t: 'face', f: [2, 4, 6] }, fp: 2, req: { int: 10 },
+    text: (f) => `魔力${num(spell(f, 'sorcery', 6), '6+杖')}の攻撃。盾でも防ぎにくい。`,
+    run: (b, f, o) => b.strike(f, o, { label: '灰の矢', dmg: spell(f, 'sorcery', 6) ?? 0, type: 'magic' }),
+  },
+  heavyarrow: {
+    name: '重い灰矢', kind: '魔術', role: 'attack', school: 'sorcery', cost: { t: 'sum', n: 5 }, fp: 5, req: { int: 18 },
+    text: (f) => `魔力${num(spell(f, 'sorcery', 10, 1.5), '10+杖×1.5')}の攻撃。`,
+    run: (b, f, o) => b.strike(f, o, { label: '重い灰矢', dmg: spell(f, 'sorcery', 10, 1.5) ?? 0, type: 'magic' }),
   },
   mend: {
-    name: '小さな癒し', kind: '奇跡', cost: { t: 'sum', n: 4 }, fp: 3,
-    text: (f) => `HPを${scaled(MEND, f.stats)}回復する。${scaleLabel(MEND)}`,
-    run: (b, f) => b.heal(f, scaled(MEND, f.stats)),
+    name: '小さな癒し', kind: '祈祷', role: 'heal', school: 'incant', cost: { t: 'sum', n: 4 }, fp: 3, req: { fai: 10 },
+    text: (f) => `HPを${num(spell(f, 'incant', 10), '10+聖印')}回復する。`,
+    run: (b, f) => b.heal(f, spell(f, 'incant', 10) ?? 0),
+  },
+  spear: {
+    name: '聖なる槍', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'face', f: [1, 3, 5] }, fp: 3, req: { fai: 15 },
+    text: (f) => `聖${num(spell(f, 'incant', 7), '7+聖印')}の攻撃。`,
+    run: (b, f, o) => b.strike(f, o, { label: '聖なる槍', dmg: spell(f, 'incant', 7) ?? 0, type: 'holy' }),
+  },
+  blessing: {
+    name: '刃の祝福', kind: '祈祷', role: 'buff', school: 'incant', cost: { t: 'sum', n: 3 }, fp: 3, req: { fai: 12 },
+    text: () => `この手番の武器攻撃と戦技のダメージ+${RULES.blessingBonus}。`,
+    run: (b, f) => {
+      f.buffs.weaponBonus = (f.buffs.weaponBonus ?? 0) + RULES.blessingBonus;
+      b.log('武器が祝福された。', b.side(f));
+    },
   },
   breath: {
-    name: '深呼吸', kind: '技', cost: { t: 'face', f: [6] },
+    name: '深呼吸', kind: '技', role: 'utility', cost: { t: 'face', f: [6] },
     text: () => 'スタミナダイス+2（上限まで）。',
     run: (b, f) => {
       const before = f.stamina;
@@ -59,15 +104,15 @@ export const CARDS: Record<string, CardDef> = {
     },
   },
   oil: {
-    name: '焼き油', kind: 'アイテム', cost: { t: 'sum', n: 1 },
+    name: '焼き油', kind: 'アイテム', role: 'buff', cost: { t: 'sum', n: 1 },
     text: () => `この手番の武器攻撃と戦技のダメージ+${RULES.oilBonus}。`,
     run: (b, f) => {
-      f.buffs.oil = true;
+      f.buffs.weaponBonus = (f.buffs.weaponBonus ?? 0) + RULES.oilBonus;
       b.log('武器に焼き油を塗った。', b.side(f));
     },
   },
   stance: {
-    name: '構え', kind: '技', cost: { t: 'sum', n: 3 },
+    name: '構え', kind: '技', role: 'utility', cost: { t: 'sum', n: 3 },
     text: () => `次の自分の手番まで、ガード消費-${RULES.stanceGuardDiscount}、カット率+${RULES.stanceCutBonus * 100}%。`,
     run: (b, f) => {
       f.buffs.stance = true;
@@ -75,7 +120,7 @@ export const CARDS: Record<string, CardDef> = {
     },
   },
   insight: {
-    name: '閃き', kind: '技', cost: { t: 'face', f: [1, 3, 5] },
+    name: '閃き', kind: '技', role: 'utility', cost: { t: 'face', f: [1, 3, 5] },
     text: () => 'カードを2枚引く。',
     run: (b, f) => {
       const got = [b.draw(f), b.draw(f)].filter((x): x is string => !!x).map((x) => CARDS[x].name);
@@ -84,7 +129,11 @@ export const CARDS: Record<string, CardDef> = {
   },
 };
 
-export const STARTER_DECK = [
-  'flask', 'flask', 'knife', 'knife', 'kick', 'kick',
-  'arrow', 'mend', 'breath', 'oil', 'stance', 'insight',
+/** 武器ダメージの表示用（焼き油などを含む） */
+export const weaponHit = (f: Fighter, s: Scaling) => weaponDamage(f, s) + (f.buffs.weaponBonus ?? 0);
+
+/** 自動デッキの優先順（上から、条件を満たすものを入れていく） */
+export const AUTO_DECK_PRIORITY: [string, number][] = [
+  ['flask', 3], ['heavyarrow', 2], ['arrow', 3], ['spear', 3], ['mend', 2], ['blessing', 2],
+  ['bloodblade', 2], ['tackle', 2], ['knife', 2], ['kick', 2], ['oil', 2], ['stance', 1], ['breath', 1], ['insight', 1],
 ];

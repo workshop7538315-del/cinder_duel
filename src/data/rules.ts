@@ -1,12 +1,32 @@
 /** 数値調整はここに集約する */
+
+/** 能力値 → 派生値の曲線。[能力値, 値] の点を直線でつなぐ（エルデンリング風のソフトキャップ） */
+export type Curve = readonly (readonly [number, number])[];
+
+export const CURVES = {
+  hp: [[1, 32], [40, 110], [60, 130], [99, 150]],
+  fp: [[1, 1], [40, 40], [60, 50], [99, 60]],
+  stInit: [[1, 2], [40, 6], [99, 8]],
+  stMax: [[1, 4], [40, 10], [99, 14]],
+  equipLoad: [[1, 30], [40, 90], [99, 130]],
+} as const satisfies Record<string, Curve>;
+
 export const RULES = {
-  // 派生値
-  hpBase: 30,
-  hpPerVit: 2,
-  fpPerMind: 1,
-  stInitBase: 1,
-  stInitPerEnd: 5, // 初期スタミナ = 1 + 持久÷5
-  stMaxPerEnd: 2, //  スタミナ上限 = 持久÷2
+  // キャラクリ
+  levelBudget: 30, //  作成時に上げられるレベル
+  statMax: 99,
+  levelBand: 15, //    対戦相手のレベル差の上限
+  deckMin: 12,
+  deckMax: 20,
+  copyLimit: 3, //     同名カードの上限
+
+  // 装備
+  /** 重量率（装備重量 ÷ 装備可能重量）の上限ごとの区分 */
+  loadLight: 0.3,
+  loadMedium: 0.7,
+  loadHeavy: 1.0,
+  /** 装備条件を満たさないとき: 基礎値にこの倍率、能力補正なし。盾のカット率にも掛かる */
+  reqPenalty: 0.6,
 
   // ラウンド
   staminaRecovery: 3, // ラウンド開始時の回復量（ステータス非依存）
@@ -18,7 +38,9 @@ export const RULES = {
   guardPer: 6,
 
   // カード効果
+  flaskRatio: 0.3,
   oilBonus: 4,
+  blessingBonus: 6,
   kickBreak: 3,
   stanceGuardDiscount: 2,
   stanceCutBonus: 0.2,

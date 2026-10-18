@@ -1,4 +1,5 @@
-import type { Cost, DamageType } from './types';
+import { STAT_NAMES } from '../data/classes';
+import type { Cost, DamageType, Requirements } from './types';
 
 export function costLabel(c: Cost, fp = 0): string {
   let s: string;
@@ -10,4 +11,13 @@ export function costLabel(c: Cost, fp = 0): string {
   return fp ? `${s}+FP${fp}` : s;
 }
 
-export const typeName = (t: DamageType): string => (t === 'magic' ? '魔法' : '物理');
+export const TYPE_NAMES: Record<DamageType, string> = { phys: '物理', magic: '魔力', holy: '聖' };
+export const typeName = (t: DamageType): string => TYPE_NAMES[t];
+
+export function reqLabel(req: Requirements): string {
+  const e = Object.entries(req);
+  return e.length ? e.map(([k, v]) => `${STAT_NAMES[k as keyof Requirements]}${v}`).join('・') : 'なし';
+}
+
+export const pct = (x: number): string => `${Math.round(x * 100)}%`;
+export const kg = (x: number): string => x.toFixed(1);
