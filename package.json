@@ -1,6 +1,6 @@
 {
   "name": "cinder-duel",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "ダイスとカードで戦う1対1の決闘ゲーム",
   "scripts": {
     "dev": "vite",
@@ -23,5 +23,8 @@
     "vitest": "~2.1.9"
   },
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.118.0"
+  }
 }
