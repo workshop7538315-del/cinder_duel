@@ -30,6 +30,7 @@ export function makeFighter(c: Character, isPlayer: boolean): Fighter {
     deck: shuffle([...c.deck]),
     discard: [],
     chain: 0,
+    bleed: 0,
     buffs: {},
   };
 }

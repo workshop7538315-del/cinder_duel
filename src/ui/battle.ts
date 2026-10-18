@@ -1,6 +1,8 @@
 import type { Character } from '../character/model';
 import { CARDS, weaponHit } from '../data/cards';
+import { weaponBleed } from '../engine/fighter';
 import { costLabel, typeName } from '../engine/format';
+import { RULES } from '../data/rules';
 import { scaleLabel } from '../engine/scaling';
 import type { Die, Fighter } from '../engine/types';
 import { Battle, cardUnusable, type BattleIO, type IncomingHit, type LogKind, type Reaction } from '../game/battle';
@@ -41,7 +43,9 @@ function panelHTML(b: Battle, f: Fighter): string {
   if (!f.isPlayer) chips.push(`<span class="chip">手札 ${f.hand.length}</span>`);
   if (f.buffs.stance) chips.push(`<span class="chip buff">構え</span>`);
   if (f.buffs.weaponBonus) chips.push(`<span class="chip buff">武器+${f.buffs.weaponBonus}</span>`);
+  if (f.buffs.weaponBleed) chips.push(`<span class="chip buff">武器に出血+${f.buffs.weaponBleed}</span>`);
   if (f.buffs.broken) chips.push(`<span class="chip debuff">体勢崩し</span>`);
+  if (f.bleed) chips.push(`<span class="chip debuff">出血 ${f.bleed}/${RULES.bleedThreshold}</span>`);
   const md = !f.isPlayer && f.action.length
     ? `<span class="minidice">${f.action.map((d) => dieHTML(d.v)).join('')}</span>` : '';
   const gear = [f.right.name, f.left?.name].filter(Boolean).join('＋');
@@ -88,16 +92,20 @@ function render(): void {
   const a = w.art;
   const wCost = b.weaponCost();
   const weak = p.rightOk ? '' : '・能力不足';
+  const bleedText = (s: Parameters<typeof weaponBleed>[1]) => {
+    const n = weaponBleed(p, s) + (p.buffs.weaponBleed ?? 0);
+    return n ? `・出血${n}` : '';
+  };
   $('#actions').innerHTML = `
     <button type="button" class="act" data-act="weapon" ${wCost && b.canPay(wCost) ? '' : 'disabled'}>
       <span class="an">${wCost ? `${esc(w.name)}・${p.chain + 1}段目` : '連撃はここまで'}</span>
       <span class="ac">${wCost ? costLabel(wCost) : '—'}</span>
-      <span class="ad">${typeName(w.type)}${weaponHit(p, w.dmg)}・最大${w.maxChain}段（+${w.inc}ずつ重く）・${scaleLabel(w.dmg)}${weak}</span></button>
+      <span class="ad">${typeName(w.type)}${weaponHit(p, w.dmg)}${bleedText(w.bleed)}・最大${w.maxChain}段（+${w.inc}ずつ重く）・${scaleLabel(w.dmg)}${weak}</span></button>
     ${a
       ? `<button type="button" class="act" data-act="art" ${b.canPay(a.cost, a.fp) ? '' : 'disabled'}>
       <span class="an">戦技「${a.name}」</span>
       <span class="ac">${costLabel(a.cost, a.fp)}</span>
-      <span class="ad">${typeName(a.type)}${weaponHit(p, a.dmg)}${a.unguardable ? '・ガード不可' : ''}・${scaleLabel(a.dmg)}${weak}</span></button>`
+      <span class="ad">${typeName(a.type)}${weaponHit(p, a.dmg)}${bleedText(a.bleed)}${a.unguardable ? '・ガード不可' : ''}・${scaleLabel(a.dmg)}${weak}</span></button>`
       : `<button type="button" class="act" disabled><span class="an">戦技なし</span><span class="ac">—</span><span class="ad">${esc(w.name)}には戦技がない</span></button>`}
     <button type="button" class="act end" data-act="end" ${myAct ? '' : 'disabled'}>手番を終える</button>`;
 

@@ -37,6 +37,10 @@ export const PRESETS: Record<string, PresetDef> = {
     name: '放浪の祈祷師', classId: 'prophet', level: 28, focus: { vit: 2, fai: 3, att: 1 },
     equip: { right: 'longsword', left: 'prayer_seal', ...sage },
   },
+  bloodhound: {
+    name: '血に酔った野伏', classId: 'bandit', level: 26, focus: { vit: 3, dex: 2, arc: 3, str: 1 },
+    equip: { right: 'oath_saber', left: 'buckler', ...travel },
+  },
   graveblade: {
     name: '墓場の剣士', classId: 'samurai', level: 32, focus: { vit: 3, dex: 3, end: 2 },
     equip: { right: 'katana', left: 'buckler', ...travel },
@@ -66,6 +70,10 @@ export const PRESETS: Record<string, PresetDef> = {
   ashknight: {
     name: '灰の騎士長', classId: 'vagabond', level: 40, strong: true, focus: { vit: 3, str: 2, dex: 2, end: 2 },
     equip: { right: 'longsword', left: 'heater', ...knight },
+  },
+  oathknight: {
+    name: '血盟の騎士', classId: 'confessor', level: 48, strong: true, focus: { vit: 3, str: 2, arc: 4, fai: 1, end: 2 },
+    equip: { right: 'oath_cleaver', left: 'oath_seal', ...knight },
   },
   priest: {
     name: 'タリスマンの司祭', classId: 'confessor', level: 46, strong: true, focus: { vit: 3, fai: 4, att: 2 },

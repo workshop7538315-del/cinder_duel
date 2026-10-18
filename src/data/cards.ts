@@ -24,6 +24,9 @@ export interface CardDef {
 const KNIFE: Scaling = { base: 6, scale: { dex: 0.3 } };
 const TACKLE: Scaling = { base: 6, scale: { str: 0.5 } };
 const BLOOD: Scaling = { base: 6, scale: { arc: 0.6 } };
+const BLOOD_BLEED: Scaling = { base: 3, scale: { arc: 0.1 } };
+const CLAW_BLEED: Scaling = { base: 4, scale: { arc: 0.12 } };
+const FEAST_BLEED: Scaling = { base: 8, scale: { arc: 0.2 } };
 
 /** 魔術・祈祷の威力 = 基礎値 + 触媒の威力 × 倍率 */
 const spell = (f: Fighter | null, school: School, base: number, mult = 1): number | null => {
@@ -63,8 +66,9 @@ export const CARDS: Record<string, CardDef> = {
   },
   bloodblade: {
     name: '血の刃', kind: '技', role: 'attack', cost: { t: 'face', f: [2, 4, 6] }, fp: 2, req: { arc: 14 },
-    text: (f) => `物理${f ? scaled(BLOOD, f.stats) : BLOOD.base}の攻撃。ガードできない。${scaleLabel(BLOOD)}`,
-    run: (b, f, o) => b.strike(f, o, { label: '血の刃', dmg: scaled(BLOOD, f.stats), type: 'phys', unguardable: true }),
+    text: (f) => `物理${f ? scaled(BLOOD, f.stats) : BLOOD.base}・出血${f ? scaled(BLOOD_BLEED, f.stats) : BLOOD_BLEED.base}の攻撃。ガードできない。${scaleLabel(BLOOD)}`,
+    run: (b, f, o) =>
+      b.strike(f, o, { label: '血の刃', dmg: scaled(BLOOD, f.stats), type: 'phys', unguardable: true, bleed: scaled(BLOOD_BLEED, f.stats) }),
   },
   arrow: {
     name: '灰の矢', kind: '魔術', role: 'attack', school: 'sorcery', cost: { t: 'face', f: [2, 4, 6] }, fp: 2, req: { int: 10 },
@@ -94,6 +98,28 @@ export const CARDS: Record<string, CardDef> = {
       b.log('武器が祝福された。', b.side(f));
     },
   },
+  // ---- 血の祈祷（血盟騎士） ----
+  bloodclaw: {
+    name: '血の爪', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'face', f: [2, 4, 6] }, fp: 3, req: { fai: 10, arc: 12 },
+    text: (f) => `物理${num(spell(f, 'incant', 5, 0.8), '5+聖印×0.8')}・出血${f ? scaled(CLAW_BLEED, f.stats) : CLAW_BLEED.base}の攻撃。${scaleLabel(CLAW_BLEED).replace('補正', '出血補正')}`,
+    run: (b, f, o) =>
+      b.strike(f, o, { label: '血の爪', dmg: spell(f, 'incant', 5, 0.8) ?? 0, type: 'phys', bleed: scaled(CLAW_BLEED, f.stats) }),
+  },
+  bloodoath: {
+    name: '血の誓い', kind: '祈祷', role: 'buff', school: 'incant', cost: { t: 'sum', n: 3 }, fp: 3, req: { fai: 12, arc: 16 },
+    text: () => `この手番の武器攻撃と戦技に出血+${RULES.bloodOathBleed}。`,
+    run: (b, f) => {
+      f.buffs.weaponBleed = (f.buffs.weaponBleed ?? 0) + RULES.bloodOathBleed;
+      b.log('武器が血をまとった。', b.side(f));
+    },
+  },
+  bloodfeast: {
+    name: '鮮血の渦', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 6 }, fp: 6, req: { fai: 14, arc: 22 },
+    text: (f) => `物理${num(spell(f, 'incant', 8, 1.2), '8+聖印×1.2')}・出血${f ? scaled(FEAST_BLEED, f.stats) : FEAST_BLEED.base}の攻撃。${scaleLabel(FEAST_BLEED).replace('補正', '出血補正')}`,
+    run: (b, f, o) =>
+      b.strike(f, o, { label: '鮮血の渦', dmg: spell(f, 'incant', 8, 1.2) ?? 0, type: 'phys', bleed: scaled(FEAST_BLEED, f.stats) }),
+  },
+
   breath: {
     name: '深呼吸', kind: '技', role: 'utility', cost: { t: 'face', f: [6] },
     text: () => 'スタミナダイス+2（上限まで）。',
@@ -134,6 +160,7 @@ export const weaponHit = (f: Fighter, s: Scaling) => weaponDamage(f, s) + (f.buf
 
 /** 自動デッキの優先順（上から、条件を満たすものを入れていく） */
 export const AUTO_DECK_PRIORITY: [string, number][] = [
-  ['flask', 3], ['heavyarrow', 2], ['arrow', 3], ['spear', 3], ['mend', 2], ['blessing', 2],
+  ['flask', 3], ['heavyarrow', 2], ['arrow', 3], ['bloodfeast', 2], ['bloodclaw', 3], ['bloodoath', 2],
+  ['spear', 3], ['mend', 2], ['blessing', 2],
   ['bloodblade', 2], ['tackle', 2], ['knife', 2], ['kick', 2], ['oil', 2], ['stance', 1], ['breath', 1], ['insight', 1],
 ];

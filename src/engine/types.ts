@@ -50,6 +50,8 @@ export interface WeaponArt {
   dmg: Scaling;
   type: DamageType;
   unguardable?: boolean;
+  /** 出血の蓄積 */
+  bleed?: Scaling;
 }
 
 interface ItemBase {
@@ -69,6 +71,8 @@ export interface Weapon extends ItemBase {
   type: DamageType;
   /** 受け能力（ガード時のカット率） */
   cut: Cut;
+  /** 当てるたびに溜まる出血（神秘で伸ばすのが基本） */
+  bleed?: Scaling;
   art?: WeaponArt;
   /** 触媒のみ: 対応する系統と、魔術・祈祷に上乗せする威力 */
   school?: School;
@@ -96,6 +100,8 @@ export interface Armor {
 export interface Buffs {
   /** この手番の武器攻撃・戦技への加算 */
   weaponBonus?: number;
+  /** この手番の武器攻撃・戦技に上乗せする出血 */
+  weaponBleed?: number;
   stance?: boolean;
   broken?: boolean;
 }
@@ -128,6 +134,8 @@ export interface Fighter {
   discard: string[];
   /** この手番で何段目まで武器攻撃したか */
   chain: number;
+  /** 溜まっている出血。上限に達すると弾けてダメージ */
+  bleed: number;
   buffs: Buffs;
 }
 
@@ -138,5 +146,7 @@ export interface Attack {
   /** 武器由来（焼き油などが乗る） */
   weapon?: boolean;
   unguardable?: boolean;
+  /** 当たったときに溜まる出血 */
+  bleed?: number;
   onHit?: (target: Fighter) => void;
 }

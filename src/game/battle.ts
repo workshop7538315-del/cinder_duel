@@ -2,7 +2,9 @@ import { CARDS } from '../data/cards';
 import { RULES } from '../data/rules';
 import { findPayment, isValidPayment, stageCost } from '../engine/cost';
 import { rollDice, rollMany } from '../engine/dice';
-import { applyArmor, catalystFor, dodgeCost, drawCard, guardCost, guardCut, spend, weaponDamage } from '../engine/fighter';
+import {
+  addBleed, applyArmor, catalystFor, dodgeCost, drawCard, guardCost, guardCut, spend, weaponBleed, weaponDamage,
+} from '../engine/fighter';
 import { costLabel, typeName } from '../engine/format';
 import type { Attack, Cost, Die, Fighter } from '../engine/types';
 import { npcDraws, npcReactChoice, npcReactDice, npcTurn } from './ai';
@@ -96,6 +98,7 @@ export class Battle {
       for (const f of [this.p, this.e]) {
         f.stamina = this.round === 1 ? f.stInit : Math.min(f.stMax, f.stamina + RULES.staminaRecovery);
         f.buffs.broken = false;
+        f.bleed = Math.max(0, f.bleed - RULES.bleedDecay);
       }
       this.log(`ラウンド ${this.round}`, 'round');
       this.update();
@@ -147,6 +150,7 @@ export class Battle {
     f.action = [];
     f.chain = 0;
     f.buffs.weaponBonus = 0;
+    f.buffs.weaponBleed = 0;
     this.turn = null;
     if (!this.over) {
       this.phase = 'wait';
@@ -179,7 +183,9 @@ export class Battle {
   async weaponAttack(f: Fighter, o: Fighter): Promise<void> {
     const w = f.right;
     f.chain++;
-    await this.strike(f, o, { label: `${w.name}・${f.chain}段目`, dmg: weaponDamage(f, w.dmg), type: w.type, weapon: true });
+    await this.strike(f, o, {
+      label: `${w.name}・${f.chain}段目`, dmg: weaponDamage(f, w.dmg), type: w.type, weapon: true, bleed: weaponBleed(f, w.bleed),
+    });
   }
 
   async weaponArt(f: Fighter, o: Fighter): Promise<void> {
@@ -187,7 +193,9 @@ export class Battle {
     if (!a) return;
     f.fp -= a.fp;
     f.chain = 0;
-    await this.strike(f, o, { label: a.name, dmg: weaponDamage(f, a.dmg), type: a.type, weapon: true, unguardable: a.unguardable });
+    await this.strike(f, o, {
+      label: a.name, dmg: weaponDamage(f, a.dmg), type: a.type, weapon: true, unguardable: a.unguardable, bleed: weaponBleed(f, a.bleed),
+    });
   }
 
   async playCard(f: Fighter, o: Fighter, index: number, pay: Die[]): Promise<void> {
@@ -228,9 +236,25 @@ export class Battle {
       this.log(`${r === 'guard' ? this.who(def) + 'はガードした。' : ''}${this.who(def)}に${dmg}ダメージ。`, r === 'guard' ? 'guard' : 'hit');
       this.io.flash(def);
       atk.onHit?.(def);
+      this.applyBleed(att, def, atk, r === 'guard');
     }
     this.update();
     if (def.hp <= 0) this.finish(att);
+  }
+
+  /** 当たった攻撃の出血を溜め、弾けたらダメージ */
+  private applyBleed(att: Fighter, def: Fighter, atk: Attack, guarded: boolean): void {
+    let amount = (atk.bleed ?? 0) + (atk.weapon ? att.buffs.weaponBleed ?? 0 : 0);
+    if (guarded) amount = Math.floor(amount * RULES.bleedGuardRatio);
+    if (amount <= 0 || def.hp <= 0) return;
+    const burst = addBleed(def, amount);
+    if (burst) {
+      def.hp = Math.max(0, def.hp - burst);
+      this.log(`${this.who(def)}は出血した！ ${burst}ダメージ。`, 'hit');
+      this.io.flash(def);
+    } else {
+      this.log(`${this.who(def)}に出血が溜まった（${def.bleed}/${RULES.bleedThreshold}）。`);
+    }
   }
 
   private async react(def: Fighter, hit: IncomingHit): Promise<Reaction> {

@@ -8,7 +8,7 @@ import { ARMORS, ARMOR_SLOTS, SHIELDS, WEAPONS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { costLabel, kg, pct, reqLabel, typeName } from '../engine/format';
 import { meetsReq } from '../engine/stats';
-import { scaleLabel } from '../engine/scaling';
+import { scaleLabel, scaled } from '../engine/scaling';
 import type { HandItem, StatKey, Stats } from '../engine/types';
 import { $, esc, show } from './dom';
 import { findCharacter, upsertCharacter } from './state';
@@ -43,8 +43,9 @@ function handDetail(item: HandItem | null, stats: Stats): string {
   const ok = meetsReq(item.req, stats);
   const parts: string[] = [`重さ ${kg(item.weight)}`, `必要 ${reqLabel(item.req)}`];
   if (item.kind !== 'shield') {
-    parts.push(`${typeName(item.type)}${item.dmg.base}（${scaleLabel(item.dmg)}）`, `[${item.first}]+[${item.inc}]×${item.maxChain}段`);
-    if (item.art) parts.push(`戦技「${item.art.name}」${costLabel(item.art.cost, item.art.fp)}`);
+    parts.push(`${typeName(item.type)}${scaled(item.dmg, stats)}（${scaleLabel(item.dmg)}）`, `[${item.first}]+[${item.inc}]×${item.maxChain}段`);
+    if (item.bleed) parts.push(`出血${scaled(item.bleed, stats)}（${scaleLabel(item.bleed)}）`);
+    if (item.art) parts.push(`戦技「${item.art.name}」${costLabel(item.art.cost, item.art.fp)}${item.art.bleed ? '・出血あり' : ''}`);
     if (item.kind === 'catalyst' && item.power) parts.push(`${item.school === 'sorcery' ? '魔術' : '祈祷'}の触媒（${scaleLabel(item.power)}）`);
   }
   parts.push(`受け 物理${pct(item.cut.phys)}・魔力${pct(item.cut.magic)}・聖${pct(item.cut.holy)}`);
