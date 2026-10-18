@@ -8,6 +8,21 @@ export function weaponDamage(f: Fighter, s: Scaling): number {
   return f.rightOk ? scaled(s, f.stats) : Math.floor(s.base * RULES.reqPenalty);
 }
 
+/** 武器の出血値（装備条件を満たさないと基礎値×倍率のみ） */
+export function weaponBleed(f: Fighter, s: Scaling | undefined): number {
+  if (!s) return 0;
+  return f.rightOk ? scaled(s, f.stats) : Math.floor(s.base * RULES.reqPenalty);
+}
+
+/** 出血を溜める。弾けたらそのダメージを返す（弾けなければ 0） */
+export function addBleed(f: Fighter, amount: number): number {
+  if (amount <= 0) return 0;
+  f.bleed += amount;
+  if (f.bleed < RULES.bleedThreshold) return 0;
+  f.bleed = 0;
+  return Math.round(f.maxHp * RULES.bleedBurstRatio) + RULES.bleedBurstBase;
+}
+
 /** その系統の触媒を持っていれば、その触媒（右手優先） */
 export function catalystFor(f: Fighter, school: School): { item: Weapon; ok: boolean } | null {
   if (f.right.kind === 'catalyst' && f.right.school === school) return { item: f.right, ok: f.rightOk };

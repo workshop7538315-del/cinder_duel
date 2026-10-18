@@ -37,10 +37,18 @@ export const RULES = {
   guardBase: 1,
   guardPer: 6,
 
+  // 出血: 溜まった値が上限に達すると「最大HP×割合＋固定値」のダメージを受けて0に戻る
+  bleedThreshold: 12,
+  bleedBurstRatio: 0.15,
+  bleedBurstBase: 6,
+  bleedDecay: 3, //    ラウンド開始時に減る量
+  bleedGuardRatio: 0.5, // ガードしたときに溜まる割合（回避なら溜まらない）
+
   // カード効果
   flaskRatio: 0.3,
   oilBonus: 4,
   blessingBonus: 6,
+  bloodOathBleed: 5,
   kickBreak: 3,
   stanceGuardDiscount: 2,
   stanceCutBonus: 0.2,

@@ -67,6 +67,26 @@ export const WEAPONS: Record<string, Weapon> = {
       dmg: { base: 14, scale: { str: 0.65 } } },
   },
 
+  // ---- 血盟騎士の武器（神秘で出血が伸びる） ----
+  oath_saber: {
+    kind: 'weapon', name: '血盟騎士の曲剣', weight: 4, req: { str: 9, dex: 12, arc: 12 },
+    first: 2, inc: 2, maxChain: 3, type: 'phys',
+    dmg: { base: 4, scale: { dex: 0.25, arc: 0.2 } },
+    bleed: { base: 2, scale: { arc: 0.1 } },
+    cut: { phys: 0.35, magic: 0.15, holy: 0.15 },
+    art: { name: '血走り', cost: { t: 'face', f: [2, 4, 6] }, fp: 3, type: 'phys',
+      dmg: { base: 8, scale: { dex: 0.2, arc: 0.35 } }, bleed: { base: 5, scale: { arc: 0.15 } } },
+  },
+  oath_cleaver: {
+    kind: 'weapon', name: '血盟騎士の大鉈', weight: 9, req: { str: 16, arc: 14 },
+    first: 4, inc: 3, maxChain: 2, type: 'phys',
+    dmg: { base: 8, scale: { str: 0.3, arc: 0.3 } },
+    bleed: { base: 4, scale: { arc: 0.12 } },
+    cut: { phys: 0.45, magic: 0.2, holy: 0.2 },
+    art: { name: '血の誓約斬り', cost: { t: 'set', f: [2, 5] }, fp: 4, type: 'phys',
+      dmg: { base: 12, scale: { str: 0.3, arc: 0.45 } }, bleed: { base: 7, scale: { arc: 0.2 } } },
+  },
+
   // ---- 触媒 ----
   novice_staff: {
     kind: 'catalyst', school: 'sorcery', name: '見習いの杖', weight: 2, req: { int: 10 },
@@ -85,6 +105,12 @@ export const WEAPONS: Record<string, Weapon> = {
     first: 3, inc: 2, maxChain: 1, type: 'phys',
     dmg: { base: 2, scale: { str: 0.1 } }, cut: { phys: 0.1, magic: 0.1, holy: 0.3 },
     power: { base: 0, scale: { fai: 0.5 } },
+  },
+  oath_seal: {
+    kind: 'catalyst', school: 'incant', name: '血盟の聖印', weight: 1.5, req: { fai: 10, arc: 14 },
+    first: 3, inc: 2, maxChain: 1, type: 'phys',
+    dmg: { base: 2, scale: { str: 0.1 } }, cut: { phys: 0.1, magic: 0.1, holy: 0.25 },
+    power: { base: 0, scale: { fai: 0.25, arc: 0.5 } },
   },
   old_talisman: {
     kind: 'catalyst', school: 'incant', name: '古びたタリスマン', weight: 0.5, req: { fai: 18 },
