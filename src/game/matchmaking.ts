@@ -12,7 +12,7 @@ export function presetCharacter(id: string, p: PresetDef = PRESETS[id]): Charact
     equip: { ...p.equip }, deck: [], createdAt: 0, updatedAt: 0,
   };
   const lo = loadout(c);
-  c.deck = p.deck ? [...p.deck] : autoDeck(lo.stats, lo.schools);
+  c.deck = p.deck ? [...p.deck] : autoDeck(lo.stats, lo.schools, lo.right);
   return c;
 }
 

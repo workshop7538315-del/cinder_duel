@@ -24,6 +24,7 @@ function idleIO(get: () => Battle): BattleIO {
     askTurnDice: async () => 0,
     askReactDice: async () => 0,
     askReactChoice: async (_h, _d, dodge, guard) => (dodge ? 'dodge' : guard ? 'guard' : 'take'),
+    askCounter: async () => 0,
     finished: () => {},
   };
 }

@@ -35,7 +35,7 @@ export async function npcTurn(b: Battle, e: Fighter, p: Fighter): Promise<void> 
   if (!b.over && e.action.length >= 3 && chance(0.5)) await tryCard(b, e, p, ['buff']);
 
   const art = e.right.art;
-  if (!b.over && art && e.fp >= art.fp && chance(0.7)) {
+  if (!b.over && art && !art.reaction && e.fp >= art.fp && chance(0.7)) {
     const pay = findPayment(e.action, art.cost);
     if (pay) {
       spend(e, pay);
@@ -64,6 +64,6 @@ export function npcReactDice(def: Fighter, hit: IncomingHit): number {
   return Math.min(def.stamina, hit.raw >= 12 ? 3 : 2);
 }
 
-export function npcReactChoice(canDodge: boolean, canGuard: boolean): Reaction {
-  return canDodge ? 'dodge' : canGuard ? 'guard' : 'take';
+export function npcReactChoice(canDodge: boolean, canGuard: boolean, canArt = false): Reaction {
+  return canArt ? 'art' : canDodge ? 'dodge' : canGuard ? 'guard' : 'take';
 }

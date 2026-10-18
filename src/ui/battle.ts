@@ -42,8 +42,9 @@ function panelHTML(b: Battle, f: Fighter): string {
   if (b.turn === f) chips.push(`<span class="chip turn">手番</span>`);
   if (!f.isPlayer) chips.push(`<span class="chip">手札 ${f.hand.length}</span>`);
   if (f.buffs.stance) chips.push(`<span class="chip buff">構え</span>`);
-  if (f.buffs.weaponBonus) chips.push(`<span class="chip buff">武器+${f.buffs.weaponBonus}</span>`);
-  if (f.buffs.weaponBleed) chips.push(`<span class="chip buff">武器に出血+${f.buffs.weaponBleed}</span>`);
+  const en = f.buffs.enchant;
+  if (en) chips.push(`<span class="chip buff">${en.name}${en.bonus ? ` +${en.bonus}` : ''}${en.bleed ? ` 出血+${en.bleed}` : ''}</span>`);
+  if (b.counter?.owner === f) chips.push(`<span class="chip turn">反撃の構え</span>`);
   if (f.buffs.broken) chips.push(`<span class="chip debuff">体勢崩し</span>`);
   if (f.bleed) chips.push(`<span class="chip debuff">出血 ${f.bleed}/${RULES.bleedThreshold}</span>`);
   const md = !f.isPlayer && f.action.length
@@ -93,7 +94,7 @@ function render(): void {
   const wCost = b.weaponCost();
   const weak = p.rightOk ? '' : '・能力不足';
   const bleedText = (s: Parameters<typeof weaponBleed>[1]) => {
-    const n = weaponBleed(p, s) + (p.buffs.weaponBleed ?? 0);
+    const n = weaponBleed(p, s) + (p.buffs.enchant?.bleed ?? 0);
     return n ? `・出血${n}` : '';
   };
   $('#actions').innerHTML = `
@@ -101,7 +102,12 @@ function render(): void {
       <span class="an">${wCost ? `${esc(w.name)}・${p.chain + 1}段目` : '連撃はここまで'}</span>
       <span class="ac">${wCost ? costLabel(wCost) : '—'}</span>
       <span class="ad">${typeName(w.type)}${weaponHit(p, w.dmg)}${bleedText(w.bleed)}・最大${w.maxChain}段（+${w.inc}ずつ重く）・${scaleLabel(w.dmg)}${weak}</span></button>
-    ${a
+    ${a && a.reaction
+      ? `<button type="button" class="act" disabled>
+      <span class="an">戦技「${a.name}」</span>
+      <span class="ac">${costLabel(a.cost, a.fp)}</span>
+      <span class="ad">攻撃されたときに回避として使う。相手が攻撃以外をしたら${costLabel(a.reaction.counterCost)}で反撃（${typeName(a.type)}${weaponHit(p, a.dmg)}${bleedText(a.bleed)}）</span></button>`
+      : a
       ? `<button type="button" class="act" data-act="art" ${b.canPay(a.cost, a.fp) ? '' : 'disabled'}>
       <span class="an">戦技「${a.name}」</span>
       <span class="ac">${costLabel(a.cost, a.fp)}</span>
@@ -142,7 +148,8 @@ function reactHead(hit: IncomingHit): string {
   return `<p class="eyebrow">リアクション</p><h3>${esc(hit.attacker.name)}の${o.label}</h3>
     <p class="incoming">${typeName(o.type)} <b>${hit.raw}</b>${o.unguardable ? '　ガード不可' : ''}</p>
     <ul class="opts"><li>${hit.dodgeCost === null ? '過重のため回避できない' : `回避 [${hit.dodgeCost}] → 0ダメージ`}</li>
-    <li>${o.unguardable ? 'ガードはできない' : `ガード [${hit.guardCost}] → ${hit.guardDmg}ダメージ（カット${Math.round(hit.guardCut * 100)}%）`}</li></ul>`;
+    <li>${o.unguardable ? 'ガードはできない' : `ガード [${hit.guardCost}] → ${hit.guardDmg}ダメージ（カット${Math.round(hit.guardCut * 100)}%）`}</li>
+    ${hit.art ? `<li>戦技「${hit.art.name}」${costLabel(hit.art.cost, hit.art.fp)} → 回避して反撃の構え</li>` : ''}</ul>`;
 }
 
 const io: BattleIO = {
@@ -178,7 +185,7 @@ const io: BattleIO = {
     return Math.max(0, k);
   },
 
-  async askReactChoice(hit, dice: Die[], canDodge, canGuard) {
+  async askReactChoice(hit, dice: Die[], canDodge, canGuard, canArt) {
     const ung = hit.attack.unguardable;
     const dodgeLabel = hit.dodgeCost === null ? '回避できない' : `回避 [${hit.dodgeCost}]`;
     const v = await modal(`<p class="eyebrow">リアクション</p><h3>出目：${dice.map((d) => d.v).join('・')}</h3>
@@ -187,9 +194,19 @@ const io: BattleIO = {
       <div class="btns">
         <button type="button" data-v="dodge" class="${canDodge ? 'primary' : ''}" ${canDodge ? '' : 'disabled'}>${dodgeLabel}<small>0ダメージ</small></button>
         <button type="button" data-v="guard" ${canGuard ? '' : 'disabled'}>${ung ? 'ガード不可' : `ガード [${hit.guardCost}]`}<small>${ung ? '' : hit.guardDmg + 'ダメージ'}</small></button>
+        ${hit.art ? `<button type="button" data-v="art" ${canArt ? '' : 'disabled'}>「${hit.art.name}」${costLabel(hit.art.cost, hit.art.fp)}<small>回避＋反撃の構え</small></button>` : ''}
         <button type="button" data-v="take">受ける<small>${hit.raw}ダメージ</small></button>
       </div>`);
     return v as Reaction;
+  },
+
+  async askCounter(info, max) {
+    const k = await askCount({
+      head: `<p class="eyebrow">反撃の好機</p><h3>${esc(info.target.name)}に隙がある</h3>
+        <p class="note">スタミナダイスを振り、${costLabel(info.cost)}を払えれば「${info.art.name}」で反撃する（リアクション不可）。</p>`,
+      max, def: Math.min(max, 2), btn: 'まとめて振る', alt: '見送る',
+    });
+    return Math.max(0, k);
   },
 
   finished(playerWon) {

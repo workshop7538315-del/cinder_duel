@@ -52,6 +52,9 @@ export interface WeaponArt {
   unguardable?: boolean;
   /** 出血の蓄積 */
   bleed?: Scaling;
+  /** あると、自分の手番には使えないリアクション専用の戦技になる。
+   *  回避として使い、そのあと相手が攻撃以外の行動をしたら counterCost を追加で払って反撃できる */
+  reaction?: { counterCost: Cost };
 }
 
 interface ItemBase {
@@ -73,6 +76,8 @@ export interface Weapon extends ItemBase {
   cut: Cut;
   /** 当てるたびに溜まる出血（神秘で伸ばすのが基本） */
   bleed?: Scaling;
+  /** エンチャント（焼き油・刃の祝福など）を受け付けない */
+  noEnchant?: boolean;
   art?: WeaponArt;
   /** 触媒のみ: 対応する系統と、魔術・祈祷に上乗せする威力 */
   school?: School;
@@ -97,11 +102,18 @@ export interface Armor {
   cut: Cut;
 }
 
+/** 武器へのエンチャント。重ね掛けはできず、新しく掛けると前のものは消える */
+export interface Enchant {
+  name: string;
+  /** 武器攻撃・戦技のダメージ加算 */
+  bonus: number;
+  /** 武器攻撃・戦技の出血加算 */
+  bleed: number;
+}
+
 export interface Buffs {
-  /** この手番の武器攻撃・戦技への加算 */
-  weaponBonus?: number;
-  /** この手番の武器攻撃・戦技に上乗せする出血 */
-  weaponBleed?: number;
+  /** この手番のあいだ有効 */
+  enchant?: Enchant;
   stance?: boolean;
   broken?: boolean;
 }
@@ -148,5 +160,7 @@ export interface Attack {
   unguardable?: boolean;
   /** 当たったときに溜まる出血 */
   bleed?: number;
+  /** 反撃など、受け手がリアクションできない攻撃 */
+  noReaction?: boolean;
   onHit?: (target: Fighter) => void;
 }

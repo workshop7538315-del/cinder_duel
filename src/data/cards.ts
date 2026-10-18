@@ -15,6 +15,8 @@ export interface CardDef {
   req?: Requirements;
   /** 魔術・祈祷は対応する触媒が必要 */
   school?: School;
+  /** エンチャント（重ね掛け不可。エンチャントできない武器には使えない） */
+  enchant?: { bonus?: number; bleed?: number };
   /** NPCの判断用 */
   role: 'attack' | 'heal' | 'buff' | 'utility';
   text: (user: Fighter | null) => string;
@@ -92,26 +94,22 @@ export const CARDS: Record<string, CardDef> = {
   },
   blessing: {
     name: '刃の祝福', kind: '祈祷', role: 'buff', school: 'incant', cost: { t: 'sum', n: 3 }, fp: 3, req: { fai: 12 },
-    text: () => `この手番の武器攻撃と戦技のダメージ+${RULES.blessingBonus}。`,
-    run: (b, f) => {
-      f.buffs.weaponBonus = (f.buffs.weaponBonus ?? 0) + RULES.blessingBonus;
-      b.log('武器が祝福された。', b.side(f));
-    },
+    enchant: { bonus: RULES.blessingBonus },
+    text: () => `エンチャント：この手番の武器攻撃と戦技のダメージ+${RULES.blessingBonus}。`,
+    run: (b, f) => b.enchant(f, '刃の祝福', { bonus: RULES.blessingBonus }),
   },
   // ---- 血の祈祷（血盟騎士） ----
   bloodclaw: {
-    name: '血の爪', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'face', f: [2, 4, 6] }, fp: 3, req: { fai: 10, arc: 12 },
+    name: '血炎の爪痕', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'face', f: [2, 4, 6] }, fp: 3, req: { fai: 10, arc: 12 },
     text: (f) => `物理${num(spell(f, 'incant', 5, 0.8), '5+聖印×0.8')}・出血${f ? scaled(CLAW_BLEED, f.stats) : CLAW_BLEED.base}の攻撃。${scaleLabel(CLAW_BLEED).replace('補正', '出血補正')}`,
     run: (b, f, o) =>
-      b.strike(f, o, { label: '血の爪', dmg: spell(f, 'incant', 5, 0.8) ?? 0, type: 'phys', bleed: scaled(CLAW_BLEED, f.stats) }),
+      b.strike(f, o, { label: '血炎の爪痕', dmg: spell(f, 'incant', 5, 0.8) ?? 0, type: 'phys', bleed: scaled(CLAW_BLEED, f.stats) }),
   },
   bloodoath: {
-    name: '血の誓い', kind: '祈祷', role: 'buff', school: 'incant', cost: { t: 'sum', n: 3 }, fp: 3, req: { fai: 12, arc: 16 },
-    text: () => `この手番の武器攻撃と戦技に出血+${RULES.bloodOathBleed}。`,
-    run: (b, f) => {
-      f.buffs.weaponBleed = (f.buffs.weaponBleed ?? 0) + RULES.bloodOathBleed;
-      b.log('武器が血をまとった。', b.side(f));
-    },
+    name: '血炎の刃', kind: '祈祷', role: 'buff', school: 'incant', cost: { t: 'sum', n: 3 }, fp: 3, req: { fai: 12, arc: 16 },
+    enchant: { bleed: RULES.bloodOathBleed },
+    text: () => `エンチャント：この手番の武器攻撃と戦技に出血+${RULES.bloodOathBleed}。`,
+    run: (b, f) => b.enchant(f, '血炎の刃', { bleed: RULES.bloodOathBleed }),
   },
   bloodfeast: {
     name: '鮮血の渦', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 6 }, fp: 6, req: { fai: 14, arc: 22 },
@@ -131,11 +129,9 @@ export const CARDS: Record<string, CardDef> = {
   },
   oil: {
     name: '焼き油', kind: 'アイテム', role: 'buff', cost: { t: 'sum', n: 1 },
-    text: () => `この手番の武器攻撃と戦技のダメージ+${RULES.oilBonus}。`,
-    run: (b, f) => {
-      f.buffs.weaponBonus = (f.buffs.weaponBonus ?? 0) + RULES.oilBonus;
-      b.log('武器に焼き油を塗った。', b.side(f));
-    },
+    enchant: { bonus: RULES.oilBonus },
+    text: () => `エンチャント：この手番の武器攻撃と戦技のダメージ+${RULES.oilBonus}。`,
+    run: (b, f) => b.enchant(f, '焼き油', { bonus: RULES.oilBonus }),
   },
   stance: {
     name: '構え', kind: '技', role: 'utility', cost: { t: 'sum', n: 3 },
@@ -156,7 +152,7 @@ export const CARDS: Record<string, CardDef> = {
 };
 
 /** 武器ダメージの表示用（焼き油などを含む） */
-export const weaponHit = (f: Fighter, s: Scaling) => weaponDamage(f, s) + (f.buffs.weaponBonus ?? 0);
+export const weaponHit = (f: Fighter, s: Scaling) => weaponDamage(f, s) + (f.buffs.enchant?.bonus ?? 0);
 
 /** 自動デッキの優先順（上から、条件を満たすものを入れていく） */
 export const AUTO_DECK_PRIORITY: [string, number][] = [

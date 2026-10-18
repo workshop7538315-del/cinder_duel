@@ -106,23 +106,25 @@ export function countCards(deck: string[]): Record<string, number> {
 }
 
 /** そのカードをデッキに入れられない理由（入れられるなら null） */
-export function cardBlock(id: string, stats: Stats, schools: School[]): string | null {
+export function cardBlock(id: string, stats: Stats, schools: School[], right?: Weapon): string | null {
   const c = CARDS[id];
   if (!c) return '存在しないカード';
+  if (c.enchant && right?.noEnchant) return `${right.name}はエンチャントできない`;
   if (c.req && !meetsReq(c.req, stats)) return `${reqLabel(c.req)}が必要`;
   if (c.school && !schools.includes(c.school)) return c.school === 'sorcery' ? '杖が必要' : '聖印かタリスマンが必要';
   return null;
 }
 
 /** 能力値と装備から、使えるカードで自動的にデッキを組む */
-export function autoDeck(stats: Stats, schools: School[], size = 15): string[] {
+export function autoDeck(stats: Stats, schools: School[], right?: Weapon, size = 15): string[] {
   const deck: string[] = [];
   for (const [id, n] of AUTO_DECK_PRIORITY) {
-    if (cardBlock(id, stats, schools)) continue;
+    if (cardBlock(id, stats, schools, right)) continue;
     for (let i = 0; i < n && deck.length < size; i++) deck.push(id);
   }
   // 足りなければ条件なしのカードで埋める
-  for (const id of ['kick', 'oil', 'stance', 'breath', 'insight']) {
+  for (const id of ['kick', 'stance', 'breath', 'insight', 'oil']) {
+    if (cardBlock(id, stats, schools, right)) continue;
     const have = deck.filter((x) => x === id).length;
     for (let i = have; i < RULES.copyLimit && deck.length < RULES.deckMin; i++) deck.push(id);
   }
@@ -139,7 +141,7 @@ export function newCharacter(classId: string, name?: string): Character {
     alloc: zeroStats(), equip: { ...cls.equip }, deck: [], createdAt: now, updatedAt: now,
   };
   const lo = loadout(c);
-  c.deck = autoDeck(lo.stats, lo.schools);
+  c.deck = autoDeck(lo.stats, lo.schools, lo.right);
   return c;
 }
 
@@ -190,8 +192,8 @@ export function checkCharacter(c: Character, opts: CheckOptions = {}): Issues {
       continue;
     }
     if (k > RULES.copyLimit) errors.push(`「${card.name}」は${RULES.copyLimit}枚までです。`);
-    const why = cardBlock(id, stats, lo.schools);
-    if (why) errors.push(`「${card.name}」を使うには${why.replace(/が必要$/, '')}が必要です。`);
+    const why = cardBlock(id, stats, lo.schools, lo.right);
+    if (why) errors.push(why.endsWith('が必要') ? `「${card.name}」を使うには${why}です。` : `「${card.name}」は使えません（${why}）。`);
   }
   return { errors, warnings };
 }

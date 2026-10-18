@@ -69,22 +69,24 @@ export const WEAPONS: Record<string, Weapon> = {
 
   // ---- 血盟騎士の武器（神秘で出血が伸びる） ----
   oath_saber: {
-    kind: 'weapon', name: '血盟騎士の曲剣', weight: 4, req: { str: 9, dex: 12, arc: 12 },
+    kind: 'weapon', name: 'レドゥビア', weight: 2.5, req: { str: 5, dex: 13, arc: 13 }, noEnchant: true,
     first: 2, inc: 2, maxChain: 3, type: 'phys',
-    dmg: { base: 4, scale: { dex: 0.25, arc: 0.2 } },
-    bleed: { base: 2, scale: { arc: 0.1 } },
-    cut: { phys: 0.35, magic: 0.15, holy: 0.15 },
-    art: { name: '血走り', cost: { t: 'face', f: [2, 4, 6] }, fp: 3, type: 'phys',
-      dmg: { base: 8, scale: { dex: 0.2, arc: 0.35 } }, bleed: { base: 5, scale: { arc: 0.15 } } },
+    dmg: { base: 4, scale: { dex: 0.3, arc: 0.25 } },
+    bleed: { base: 3, scale: { arc: 0.1 } },
+    cut: { phys: 0.2, magic: 0.1, holy: 0.1 },
+    // FPを多めに払うかわりに、ダイスはどれでも1個でよい
+    art: { name: 'レドゥビアの血刃', cost: { t: 'sum', n: 1 }, fp: 4, type: 'phys',
+      dmg: { base: 7, scale: { dex: 0.2, arc: 0.35 } }, bleed: { base: 5, scale: { arc: 0.15 } } },
   },
   oath_cleaver: {
-    kind: 'weapon', name: '血盟騎士の大鉈', weight: 9, req: { str: 16, arc: 14 },
+    kind: 'weapon', name: '血のマチェーテ', weight: 10, req: { str: 16, arc: 14 }, noEnchant: true,
     first: 4, inc: 3, maxChain: 2, type: 'phys',
-    dmg: { base: 8, scale: { str: 0.3, arc: 0.3 } },
+    dmg: { base: 9, scale: { str: 0.35, arc: 0.3 } },
     bleed: { base: 4, scale: { arc: 0.12 } },
     cut: { phys: 0.45, magic: 0.2, holy: 0.2 },
-    art: { name: '血の誓約斬り', cost: { t: 'set', f: [2, 5] }, fp: 4, type: 'phys',
-      dmg: { base: 12, scale: { str: 0.3, arc: 0.45 } }, bleed: { base: 7, scale: { arc: 0.2 } } },
+    // 回避として使い、相手が攻撃以外をしたら追加で払って反撃（反撃の威力と出血はここ）
+    art: { name: '王朝鉈技', cost: { t: 'sum', n: 4 }, fp: 3, type: 'phys', reaction: { counterCost: { t: 'sum', n: 3 } },
+      dmg: { base: 10, scale: { str: 0.3, arc: 0.4 } }, bleed: { base: 6, scale: { arc: 0.2 } } },
   },
 
   // ---- 触媒 ----
@@ -107,10 +109,11 @@ export const WEAPONS: Record<string, Weapon> = {
     power: { base: 0, scale: { fai: 0.5 } },
   },
   oath_seal: {
-    kind: 'catalyst', school: 'incant', name: '血盟の聖印', weight: 1.5, req: { fai: 10, arc: 14 },
+    kind: 'catalyst', school: 'incant', name: '血盟の印', weight: 1.5, req: { fai: 10, arc: 14 },
     first: 3, inc: 2, maxChain: 1, type: 'phys',
     dmg: { base: 2, scale: { str: 0.1 } }, cut: { phys: 0.1, magic: 0.1, holy: 0.25 },
-    power: { base: 0, scale: { fai: 0.25, arc: 0.5 } },
+    // 信仰はほとんど効かず、神秘が主。筋力と技量も少し乗る
+    power: { base: 0, scale: { fai: 0.1, arc: 0.5, str: 0.1, dex: 0.1 } },
   },
   old_talisman: {
     kind: 'catalyst', school: 'incant', name: '古びたタリスマン', weight: 0.5, req: { fai: 18 },
