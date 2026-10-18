@@ -53,3 +53,11 @@ https://workshop7538315-del.github.io/cinder_duel/
 - **secret key・データベースのパスワード・Discord の Client Secret はリポジトリに入れない**
 - ログイン後の戻り先として、Supabase の Authentication → URL Configuration に公開URLと `http://localhost:5173/` を登録してある
 - テーブル定義は `docs/supabase.sql`
+
+## 入口のパスワード
+
+ログインしていない人は、入るときにパスワードが必要（`src/ui/gate.ts`）。一度入ればそのブラウザでは覚えておく。
+
+- コードにはパスワードそのものではなくハッシュだけを置いている。変えるときは `GATE_HASH` を `sha256('cinder_duel:' + 新しいパスワード)` に差し替える（変えると、覚えていたブラウザでも入り直しになる）
+- ブラウザの中だけで確かめる仕組みなので、詳しい人なら回避できる。身内以外を遠ざける程度のもの
+- Discordでログインした人はパスワードなしで入れる。誰でもアカウントを作れないようにするには、Supabase で新規登録を止める
