@@ -9,3 +9,4 @@
 - 変更後は `npm run typecheck && npm test` を通す
 - ルールブック（ダークソウルTRPG）の本文・画像はリポジトリに入れない
 - 保存データの形式を変えたら `SAVE_VERSION` を上げて `migrate` に変換を足す（古いセーブを壊さない）
+- Supabase の secret key などの秘密の値はリポジトリに入れない（公開リポジトリ）。publishable key のみ `src/net/config.ts` に置く

@@ -3,7 +3,10 @@ import { mergeSave, parseSave, serializeSave } from '../character/storage';
 import { RULES } from '../data/rules';
 import { $, esc, show } from './dom';
 import { openEditor } from './editor';
-import { characters, deleteCharacter, getSave, replaceSave, storageOk } from './state';
+import { signInWithDiscord, signOut } from '../net/cloud';
+import {
+  characters, deleteCharacter, getAccount, getSave, onSyncChange, replaceSave, storageOk, syncNow, syncStatus,
+} from './state';
 import { charSummary, openVersus } from './versus';
 
 let confirmDelete: string | null = null;
@@ -19,7 +22,28 @@ function dataMsg(t: string): void {
   $('#dataMsg').textContent = t;
 }
 
+const SYNC_TEXT = {
+  off: '',
+  syncing: '同期中…',
+  ok: '同期済み',
+  error: '同期できませんでした',
+} as const;
+
+function renderAccount(): void {
+  const a = getAccount();
+  const st = syncStatus();
+  $('#account').innerHTML = a
+    ? `<div class="acc-main"><span class="acc-name">${esc(a.name)}</span>
+        <span class="acc-sync sync-${st}">${SYNC_TEXT[st]}</span></div>
+       <div class="row-btns">${st === 'error' ? '<button type="button" class="btn" data-acc="retry">もう一度同期</button>' : ''}
+        <button type="button" class="btn" data-acc="out">ログアウト</button></div>`
+    : `<div class="acc-main"><span class="acc-name dim">ログインしていません</span>
+        <span class="note">ログインすると、キャラクターをどの端末からでも使えます。</span></div>
+       <button type="button" class="btn discord" data-acc="in">Discordでログイン</button>`;
+}
+
 function render(): void {
+  renderAccount();
   const list = characters();
   $('#charList').innerHTML = list.length
     ? list.map((c) => {
@@ -67,6 +91,19 @@ async function importFile(file: File): Promise<void> {
 }
 
 export function bindHome(): void {
+  onSyncChange(() => {
+    if (!$('#home').hidden) render();
+  });
+  $('#account').addEventListener('click', async (ev) => {
+    const act = (ev.target as HTMLElement).closest<HTMLElement>('[data-acc]')?.dataset.acc;
+    try {
+      if (act === 'in') await signInWithDiscord();
+      else if (act === 'out') await signOut();
+      else if (act === 'retry') await syncNow();
+    } catch {
+      dataMsg('ログインの処理に失敗しました。通信状況を確かめて、もう一度試してください。');
+    }
+  });
   $('#newChar').addEventListener('click', () => openEditor(null, () => openHome()));
   $('#charList').addEventListener('click', (ev) => {
     const t = ev.target as HTMLElement;

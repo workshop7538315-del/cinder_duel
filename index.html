@@ -12,10 +12,11 @@
 <div id="app">
   <section id="home">
     <div class="hero">
-      <p class="eyebrow">v0.2 ・ 1対1</p>
+      <p class="eyebrow">v0.3 ・ 1対1</p>
       <h1>灰の決闘</h1>
       <p>スタミナダイスを振り、出目を武器とカードに振り分ける決闘。攻めに使うか、相手の攻撃に備えて残すか。</p>
     </div>
+    <div class="account" id="account"></div>
     <div class="sec-h"><p class="eyebrow">キャラクター</p><button type="button" class="btn primary" id="newChar">新しく作る</button></div>
     <div class="char-list" id="charList"></div>
     <details class="rules">
@@ -30,7 +31,7 @@
     </details>
     <div class="data-box">
       <p class="eyebrow">セーブデータ</p>
-      <p class="note">キャラクターはこのブラウザに自動で保存されます。別の端末やブラウザに移すときは、書き出したファイルを向こうで読み込んでください。</p>
+      <p class="note">キャラクターはこのブラウザに自動で保存されます（ログイン中はアカウントにも保存されます）。ログインせずに別の端末へ移すときは、書き出したファイルを向こうで読み込んでください。</p>
       <div class="row-btns">
         <button type="button" class="btn" id="exportBtn">書き出す</button>
         <label class="btn" for="importFile">読み込む</label>
