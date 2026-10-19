@@ -33,7 +33,7 @@ describe('出血', () => {
 
 describe('血盟騎士の装備と祈祷', () => {
   it('盗賊は神秘と信仰を少し上げれば、レドゥビアと血盟の印で血の祈祷を組める', () => {
-    const c = newCharacter('bandit');
+    const c = { ...newCharacter('bandit'), boughtLevels: 4 };
     c.alloc.fai = 4;
     c.alloc.str = 0;
     c.equip.right = 'oath_saber';

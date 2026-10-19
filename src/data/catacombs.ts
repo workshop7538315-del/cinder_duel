@@ -22,6 +22,8 @@ export interface CatacombDef {
   enemies: EnemyDef[];
   boss: EnemyDef;
   loot: LootDef[];
+  /** 敵のレベルの補正（自分のレベルとの差）。書かなければ DUNGEON の値（自分より低い） */
+  levelOffset?: { enemy: number; boss: number };
 }
 
 const travel = { head: 'travel_hood', chest: 'travel_coat', arms: 'travel_gloves', legs: 'travel_boots' };
@@ -106,6 +108,8 @@ export const CATACOMBS: Record<string, CatacombDef> = {
   blood: {
     name: '血盟騎士の地下墓',
     blurb: '血の誓いを立てた騎士たち。血の武器と血炎の祈祷が眠る。',
+    // 煤けた地下墓より奥。敵は自分より強い
+    levelOffset: { enemy: 2, boss: 5 },
     enemies: [
       { name: '血盟の従士', classId: 'bandit', focus: { vit: 3, dex: 2, arc: 3 }, equip: { right: 'oath_saber', left: 'buckler', ...travel } },
       { name: '血盟騎士', classId: 'confessor', focus: { vit: 3, str: 2, arc: 3, end: 1 }, equip: { right: 'oath_cleaver', left: 'oath_seal', ...knight } },
@@ -137,6 +141,9 @@ export const DUNGEON = {
   enemyRoomStep: 1,
   /** 主のレベル = 自分のレベル + bossLevelOffset + 階層×floorStep */
   bossLevelOffset: -2,
+  /** 困難な地下墓は書いたレベルが基本だが、自分のほうが高ければ「自分のレベル＋この値」になる */
+  fixedAboveEnemy: 2,
+  fixedAboveBoss: 5,
   /** 敵の最大HPの倍率（部屋をまたいでHPを持ち越すので、道中の敵は控えめ） */
   enemyHpRatio: 0.5,
   bossHpRatio: 1,
