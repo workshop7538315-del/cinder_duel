@@ -165,28 +165,28 @@ export const WEAPONS: Record<string, Weapon> = {
   },
   // ---- 底の触媒武器（武器としても、魔術の触媒としても使える） ----
   deep_staff: {
-    kind: 'weapon', school: 'sorcery', sockets: 3, name: '地底の大剣', weight: 11, req: { str: 18, int: 16 },
+    kind: 'weapon', school: 'sorcery', sockets: 3, name: '地底の大剣', weight: 11, req: { str: 34, int: 28 },
     first: 5, inc: 3, maxChain: 2, type: 'phys',
     dmg: { base: 9, scale: { str: 0.4, int: 0.2 } }, cut: { phys: 0.55, magic: 0.35, holy: 0.2 },
     power: { base: 0, scale: { int: 0.45, str: 0.15 } },
     art: { name: '地揺れ斬り', cost: { t: 'set', f: [2, 4] }, fp: 4, type: 'magic', dmg: { base: 13, scale: { str: 0.35, int: 0.3 } } },
   },
   hull_staff: {
-    kind: 'weapon', school: 'sorcery', sockets: 3, name: '船底の曲剣', weight: 4, req: { dex: 12, int: 14, arc: 10 },
+    kind: 'weapon', school: 'sorcery', sockets: 3, name: '船底の曲剣', weight: 4, req: { dex: 26, int: 26, arc: 20 },
     first: 2, inc: 2, maxChain: 3, type: 'phys',
     dmg: { base: 4, scale: { dex: 0.25, int: 0.15, arc: 0.1 } }, cut: { phys: 0.35, magic: 0.3, holy: 0.15 },
     power: { base: 0, scale: { int: 0.45, arc: 0.2 } },
     art: { name: '渦潮斬り', cost: { t: 'face', f: [6] }, fp: 3, type: 'magic', dmg: { base: 9, scale: { dex: 0.2, int: 0.3 } } },
   },
   gorge_staff: {
-    kind: 'weapon', school: 'sorcery', sockets: 3, name: '谷底の細剣', weight: 3, req: { dex: 14, int: 16 },
+    kind: 'weapon', school: 'sorcery', sockets: 3, name: '谷底の細剣', weight: 3, req: { dex: 30, int: 30 },
     first: 2, inc: 2, maxChain: 3, type: 'phys',
     dmg: { base: 4, scale: { dex: 0.35, int: 0.15 } }, cut: { phys: 0.25, magic: 0.3, holy: 0.1 },
     power: { base: 0, scale: { int: 0.5, dex: 0.15 } },
     art: { name: '谷風突き', cost: { t: 'face', f: [1] }, fp: 3, type: 'magic', unguardable: true, dmg: { base: 8, scale: { dex: 0.3, int: 0.2 } } },
   },
   lake_staff: {
-    kind: 'weapon', school: 'sorcery', sockets: 3, name: '湖底の直剣', weight: 4, req: { str: 10, dex: 10, int: 14, fai: 10 },
+    kind: 'weapon', school: 'sorcery', sockets: 3, name: '湖底の直剣', weight: 4, req: { str: 18, dex: 18, int: 28, fai: 20 },
     first: 3, inc: 2, maxChain: 2, type: 'phys',
     dmg: { base: 6, scale: { str: 0.2, int: 0.15, fai: 0.15 } }, cut: { phys: 0.5, magic: 0.4, holy: 0.3 },
     power: { base: 0, scale: { int: 0.45, fai: 0.2 } },
@@ -194,7 +194,7 @@ export const WEAPONS: Record<string, Weapon> = {
   },
   // 海底の触媒武器。戦技で相手に呪死を溜める
   sea_harpoon: {
-    kind: 'weapon', school: 'sorcery', sockets: 3, name: '海底の銛', weight: 6, req: { str: 12, dex: 12, int: 16, arc: 12 },
+    kind: 'weapon', school: 'sorcery', sockets: 3, name: '海底の銛', weight: 6, req: { str: 22, dex: 22, int: 32, arc: 24 },
     first: 3, inc: 3, maxChain: 2, type: 'phys',
     dmg: { base: 7, scale: { str: 0.2, dex: 0.2, int: 0.15 } }, cut: { phys: 0.45, magic: 0.4, holy: 0.25 },
     power: { base: 0, scale: { int: 0.45, arc: 0.25 } },
@@ -203,21 +203,21 @@ export const WEAPONS: Record<string, Weapon> = {
   },
   // ---- 底の武器（2本目）。どれも触媒を兼ね、淵結晶を3つはめられる ----
   deep_hammer: {
-    kind: 'weapon', school: 'sorcery', sockets: 3, name: '地底の大槌', weight: 12, req: { str: 20, int: 12 },
+    kind: 'weapon', school: 'sorcery', sockets: 3, name: '地底の大槌', weight: 12, req: { str: 40, int: 24 },
     first: 5, inc: 4, maxChain: 2, type: 'phys',
     dmg: { base: 11, scale: { str: 0.5, int: 0.1 } }, cut: { phys: 0.6, magic: 0.3, holy: 0.2 },
     power: { base: 0, scale: { int: 0.35, str: 0.2 } },
     art: { name: '地割り', cost: { t: 'set', f: [3, 5] }, fp: 4, type: 'phys', dmg: { base: 15, scale: { str: 0.45, int: 0.15 } } },
   },
   hull_anchor: {
-    kind: 'weapon', school: 'sorcery', sockets: 3, name: '船底の錨', weight: 9, req: { str: 16, int: 12, arc: 12 },
+    kind: 'weapon', school: 'sorcery', sockets: 3, name: '船底の錨', weight: 9, req: { str: 32, int: 22, arc: 24 },
     first: 4, inc: 3, maxChain: 2, type: 'phys',
     dmg: { base: 8, scale: { str: 0.35, arc: 0.15 } }, cut: { phys: 0.5, magic: 0.3, holy: 0.2 },
     power: { base: 0, scale: { int: 0.4, arc: 0.25 } },
     art: { name: '錨投げ', cost: { t: 'face', f: [1] }, fp: 3, type: 'magic', dmg: { base: 10, scale: { str: 0.3, arc: 0.2 } } },
   },
   gorge_scythe: {
-    kind: 'weapon', school: 'sorcery', sockets: 3, name: '谷底の大鎌', weight: 6, req: { dex: 16, int: 12, arc: 14 },
+    kind: 'weapon', school: 'sorcery', sockets: 3, name: '谷底の大鎌', weight: 6, req: { dex: 32, int: 22, arc: 28 },
     first: 3, inc: 3, maxChain: 2, type: 'phys',
     dmg: { base: 6, scale: { dex: 0.3, arc: 0.15 } }, cut: { phys: 0.35, magic: 0.25, holy: 0.15 },
     bleed: { base: 4, scale: { arc: 0.12 } },
@@ -226,7 +226,7 @@ export const WEAPONS: Record<string, Weapon> = {
       bleed: { base: 7, scale: { arc: 0.15 } } },
   },
   lake_spear: {
-    kind: 'weapon', school: 'sorcery', sockets: 3, name: '湖底の槍', weight: 5, req: { dex: 14, int: 18 },
+    kind: 'weapon', school: 'sorcery', sockets: 3, name: '湖底の槍', weight: 5, req: { dex: 26, int: 34 },
     first: 3, inc: 2, maxChain: 3, type: 'phys',
     dmg: { base: 5, scale: { dex: 0.25, int: 0.15 } }, cut: { phys: 0.4, magic: 0.4, holy: 0.25 },
     power: { base: 0, scale: { int: 0.5 } },
@@ -234,7 +234,7 @@ export const WEAPONS: Record<string, Weapon> = {
   },
   // 深海でだけ手に入る
   sea_falchion: {
-    kind: 'weapon', school: 'sorcery', sockets: 3, name: '海淵の曲刀', weight: 5, req: { dex: 16, int: 14, arc: 16 },
+    kind: 'weapon', school: 'sorcery', sockets: 3, name: '海淵の曲刀', weight: 5, req: { dex: 34, int: 30, arc: 34 },
     first: 2, inc: 2, maxChain: 3, type: 'phys', curse: 1,
     dmg: { base: 5, scale: { dex: 0.25, arc: 0.15 } }, cut: { phys: 0.4, magic: 0.4, holy: 0.2 },
     power: { base: 0, scale: { int: 0.45, arc: 0.25 } },
