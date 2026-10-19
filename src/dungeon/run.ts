@@ -38,6 +38,12 @@ export interface RunState {
   deaths?: number;
   /** 底に落ちたとき、入ろうとしていた困難な地下墓 */
   from?: string;
+  /** 今の部屋を片付けた（先へ進むか、篝火に戻るかを選ぶところ） */
+  cleared?: boolean;
+  /** 最後にたどり着いた篝火の部屋（なければ入口の篝火） */
+  bonfire?: { floor: number; room: number } | null;
+  /** 入口の篝火にいる */
+  atEntrance?: boolean;
 }
 
 export function startRun(charId: string, d: Dungeon): RunState {
@@ -57,9 +63,28 @@ export function roomNumber(d: Dungeon, run: RunState): number {
 }
 
 function advance(d: Dungeon, run: RunState): RunState {
-  if (run.room + 1 < d.floors[run.floor].length) return { ...run, room: run.room + 1 };
-  return { ...run, floor: run.floor + 1, room: 0 };
+  const pos = run.room + 1 < d.floors[run.floor].length ? { floor: run.floor, room: run.room + 1 } : { floor: run.floor + 1, room: 0 };
+  const isBonfire = d.floors[pos.floor]?.[pos.room]?.kind === 'bonfire';
+  return { ...run, ...pos, cleared: false, atEntrance: false, bonfire: isBonfire ? pos : run.bonfire ?? null };
 }
+
+/** 片付けた部屋から先へ進む（倒した主の部屋もそのまま通れる） */
+export const proceed = (d: Dungeon, run: RunState): RunState => advance(d, run);
+
+/** この部屋の主はもう倒した（篝火に戻ってから通り直すとき） */
+export const bossAlreadyDown = (d: Dungeon, run: RunState): boolean =>
+  currentRoom(d, run)?.kind === 'boss' && (run.bossDown ?? []).includes(run.floor);
+
+/** 篝火に戻る（最後にたどり着いた篝火。なければ入口）。そこまでの敵は復活する（宝箱と落とし物は戻らない） */
+export function returnToBonfire(run: RunState): RunState {
+  const b = run.bonfire ?? null;
+  return b
+    ? { ...run, floor: b.floor, room: b.room, cleared: false, atEntrance: false }
+    : { ...run, floor: 0, room: 0, cleared: false, atEntrance: true };
+}
+
+/** 入口の篝火から出発する */
+export const departEntrance = (run: RunState): RunState => ({ ...run, floor: 0, room: 0, atEntrance: false, cleared: false });
 
 const roomKey = (run: RunState) => `${run.floor}:${run.room}`;
 export const isLooted = (run: RunState): boolean => (run.looted ?? []).includes(roomKey(run));
@@ -82,7 +107,7 @@ export const stainHere = (run: RunState): Bloodstain | null =>
 /** 宝箱を開ける。一度開けた宝箱は空 */
 export function openChest(d: Dungeon, run: RunState): RunState {
   const room = currentRoom(d, run)!;
-  return advance(d, isLooted(run) ? run : gain(run, room, true));
+  return { ...(isLooted(run) ? run : gain(run, room, true)), cleared: true };
 }
 
 /** 落としたソウルを拾う（戦闘中に手番を使ったとき） */
@@ -100,9 +125,9 @@ export function winBattle(d: Dungeon, run: RunState, hp: number, fp: number): Ru
     if (run.floor === d.floors.length - 1) {
       return { ...next, bossDown, souls: next.souls + d.totalRooms * DUNGEON.clearBonusPerRoom, status: 'cleared' };
     }
-    return advance(d, { ...next, bossDown });
+    return { ...next, bossDown, cleared: true };
   }
-  return advance(d, next);
+  return { ...next, cleared: true };
 }
 
 /** 退却したときに持ち帰れる拾得物（主を倒した階層のもの） */
@@ -114,7 +139,7 @@ export function loseBattle(run: RunState): RunState {
   return {
     ...run,
     stain: run.souls > 0 ? { floor: run.floor, room: run.room, souls: run.souls } : null,
-    souls: 0, floor: 0, room: 0, hp: null, fp: null, deaths: (run.deaths ?? 0) + 1,
+    souls: 0, floor: 0, room: 0, hp: null, fp: null, deaths: (run.deaths ?? 0) + 1, cleared: false, atEntrance: false,
   };
 }
 
