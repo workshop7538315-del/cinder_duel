@@ -112,6 +112,36 @@ export interface Armor {
   cut: Cut;
 }
 
+/** 強敵・主の行動ひとつ */
+export interface PatternMove {
+  name: string;
+  /** 攻撃の元（武器の攻撃か戦技）。なければ攻撃しない */
+  use?: 'weapon' | 'art';
+  /** 当てる回数（既定1） */
+  hits?: number;
+  /** ダメージの倍率（既定1） */
+  mult?: number;
+  unguardable?: boolean;
+  /** 次の自分の手番まで、必ずガードする（ガード不可の攻撃は受ける） */
+  guard?: boolean;
+  /** 最大HPのこの割合だけ回復する */
+  heal?: number;
+  /** カードの効果を使う（魔術・祈祷など。スタミナもFPも払わない） */
+  card?: string;
+  /** random のときの選ばれやすさ（既定1） */
+  weight?: number;
+}
+
+/** 強敵・主の動き方。スタミナも手札もなく、決まった順番かランダムで動く */
+export interface Behavior {
+  /** cycle: moves を順番に繰り返す / random: 重みで選ぶ */
+  mode: 'cycle' | 'random';
+  moves: PatternMove[];
+  /** 攻撃されたときに回避する確率・ガードする確率（その敵次第） */
+  dodge: number;
+  guard: number;
+}
+
 /** 淵結晶（底の武器にはめる）で強める・弱めるもの */
 export type CrystalKey = 'atk' | 'art' | 'spell' | 'bleed' | 'curse' | 'hp' | 'fp' | 'cut' | 'guard' | 'stMax';
 
@@ -221,6 +251,8 @@ export interface Fighter {
   drained?: number;
   /** アクセサリによる戦闘中の効果 */
   acc?: Mods;
+  /** 強敵・主: 行動パターンと、次にする行動（予告）。あるとスタミナも手札も使わない */
+  pattern?: { behavior: Behavior; next: number; guarding?: boolean; rank: '強敵' | '主' };
   buffs: Buffs;
 }
 

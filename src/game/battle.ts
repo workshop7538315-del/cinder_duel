@@ -9,6 +9,8 @@ import {
 import { costLabel, typeName } from '../engine/format';
 import type { Attack, Cost, Die, Fighter, WeaponArt } from '../engine/types';
 import { npcDiscards, npcDraws, npcReactChoice, npcReactDice, npcTurn } from './ai';
+import { patternReact, patternTurn } from './pattern';
+import { AUTO_BEHAVIOR } from '../data/behaviors';
 
 export type Reaction = 'dodge' | 'guard' | 'take' | 'art';
 export type LogKind = 'round' | 'sys' | 'me' | 'foe' | 'hit' | 'guard' | 'dodge';
@@ -96,9 +98,10 @@ export class Battle {
     readonly e: Fighter,
     private io: BattleIO,
   ) {
+    // 強敵・主（パターンで動く）は手札を持たない
     for (let i = 0; i < RULES.handStart; i++) {
-      drawCard(p);
-      drawCard(e);
+      if (!p.pattern) drawCard(p);
+      if (!e.pattern) drawCard(e);
     }
   }
 
@@ -131,7 +134,8 @@ export class Battle {
     while (!this.over) {
       this.round++;
       for (const f of [this.p, this.e]) {
-        f.stamina = this.round === 1 ? f.stInit : Math.min(f.stMax, f.stamina + RULES.staminaRecovery);
+        // 強敵・主はスタミナを使わない
+        f.stamina = f.pattern ? 0 : this.round === 1 ? f.stInit : Math.min(f.stMax, f.stamina + RULES.staminaRecovery);
         f.buffs.broken = false;
         f.bleed = Math.max(0, f.bleed - RULES.bleedDecay);
         f.curse = Math.max(0, (f.curse ?? 0) - RULES.curseDecay);
@@ -182,6 +186,7 @@ export class Battle {
     this.turn = f;
     this.update();
     if (f.isPlayer) await this.playerTurn();
+    else if (f.pattern) await patternTurn(this, f, o);
     else await npcTurn(this, f, o);
     // 手番を終えるのも「攻撃以外」なので、反撃の構えがあれば反撃される
     await this.afterAction(f, false);
@@ -345,7 +350,8 @@ export class Battle {
     this.update();
     await this.wait(att.isPlayer ? 250 : 550);
 
-    const cut = guardCut(def, atk.type);
+    // 強敵・主のガードは、盾でも受けきれない（上限あり）
+    const cut = def.pattern ? Math.min(guardCut(def, atk.type), AUTO_BEHAVIOR.guardCutCap) : guardCut(def, atk.type);
     const hit: IncomingHit = {
       attacker: att, attack: atk, raw,
       dodgeCost: dodgeCost(def),
@@ -410,6 +416,10 @@ export class Battle {
   }
 
   private async react(def: Fighter, hit: IncomingHit): Promise<Reaction> {
+    if (def.pattern) {
+      await this.wait(400);
+      return patternReact(def, hit);
+    }
     if (def.stamina === 0) {
       if (def.isPlayer) await this.io.askReactDice(hit, 0);
       return 'take';

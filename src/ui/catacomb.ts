@@ -292,7 +292,7 @@ function renderRun(): void {
   } else if (room.kind === 'battle' || room.kind === 'boss') {
     const e = room.enemy!;
     const finalBoss = room.kind === 'boss' && run.floor === dungeon.floors.length - 1;
-    action = `<div class="room-card rk-${room.kind}"><p class="eyebrow">${room.kind === 'boss' ? (finalBoss ? 'この地下墓の主' : `地下${run.floor + 1}層の主`) : '敵'}</p>
+    action = `<div class="room-card rk-${room.kind}"><p class="eyebrow">${room.kind === 'boss' ? (finalBoss ? 'この地下墓の主' : `地下${run.floor + 1}層の主`) : e.foeRank === '強敵' ? '強敵' : '敵'}</p>
       <b>${esc(e.name)}</b><span>Lv${charLevel(e)}・${[loadout(e).right.name, loadout(e).left?.name].filter(Boolean).join('＋')}</span>
       ${dangerNote(e)}
       ${stainHere(run) ? `<p class="stain-note">ここにあなたの血痕がある（ソウル ${stainHere(run)!.souls}）。この部屋の敵に勝てば取り戻せる。戦闘中に手番の初めの「ソウルを回収する」で先に取り戻しておけば、この戦いで倒れても失わない（ここに落とし直す）。回収しないまま倒れると失われる。</p>` : ''}

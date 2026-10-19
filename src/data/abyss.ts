@@ -1,3 +1,4 @@
+import { BEHAVIORS } from './behaviors';
 import type { EnemyDef, LootDef } from './catacombs';
 
 /**
@@ -97,7 +98,7 @@ export interface SeaDef {
 
 export const SEA_FOE = {
   fishman: { name: '深海の魚人', classId: 'bandit', focus: { vit: 3, dex: 4, arc: 2, end: 1 }, equip: { right: 'fishman_claw', left: null, ...none } },
-  crab: { name: '海底の大蟹', classId: 'hero', focus: { vit: 5, str: 4, end: 2 }, equip: { right: 'crab_pincer', left: null, ...none } },
+  crab: { name: '海底の大蟹', classId: 'hero', focus: { vit: 5, str: 4, end: 2 }, equip: { right: 'crab_pincer', left: null, ...none }, elite: true, behavior: BEHAVIORS.crab },
   drowned: { name: '溺れ人の亡霊', classId: 'astrologer', focus: { vit: 3, int: 4, att: 3 }, equip: { right: 'drowned_grasp', left: null, ...none } },
   serpent: { name: '海淵の大蛇', classId: 'wretch', focus: { vit: 5, str: 3, arc: 4, att: 2, end: 2 }, equip: { right: 'serpent_fang', left: null, ...none } },
 } satisfies Record<string, EnemyDef>;

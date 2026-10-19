@@ -315,3 +315,8 @@ select.sock.cursed{border-color:#a8433b;color:#e8c4c1}
 .gains li.cursed{color:#e8c4c1}
 .deep-box{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding:12px;border:1px solid #2c4a5a;border-radius:8px;background:rgba(30,70,95,.18)}
 .deep-box .btn{align-self:flex-start}
+
+/* ---- 強敵・主の予告 ---- */
+.row.intent .nx{flex:1;font-weight:700;color:#e9c46a;letter-spacing:.04em}
+.chip.rank{background:#4a2a2a;color:#f0c6c0;border-color:#7a3a35}
+.row.intent .num{white-space:nowrap;width:auto}

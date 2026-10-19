@@ -5,6 +5,7 @@ import { FIXED, FIXED_CATACOMBS } from '../data/fixed';
 import { CATACOMB_ACCESSORIES } from '../data/accessories';
 import { CRYSTAL, CRYSTAL_KEYS, rollCrystal, rollCursedCrystal } from '../data/crystals';
 import type { CrystalKey } from '../engine/types';
+import { autoBehavior } from '../game/pattern';
 import { pick, pickWeighted, randInt, seededRng, type SeededRng } from './rng';
 
 export type RoomKind = 'battle' | 'chest' | 'bonfire' | 'boss';
@@ -23,6 +24,8 @@ export interface Room {
   clue?: string;
   /** 2周目以降の追加の落とし物（アクセサリ） */
   extra?: LootDef | null;
+  /** 強敵の補正を掛けた（二重に掛けないため） */
+  eliteDone?: boolean;
 }
 
 export interface Dungeon {
@@ -55,7 +58,27 @@ function buildEnemy(def: EnemyDef, level: number, tag: string): Character {
   const lo = loadout(c);
   c.deck = autoDeck(lo.stats, lo.schools, lo.right);
   c.inventory = inventoryOf(c.equip, c.deck);
+  if (def.elite || def.behavior) {
+    c.behavior = def.behavior ?? autoBehavior(lo, c.deck);
+    c.foeRank = '強敵';
+  }
   return c;
+}
+
+/** 主の部屋の敵は「主」としてパターンで動く（動き方がなければ武器と装備から作る）。
+ *  道中の強敵は、HPが多くソウルも多い */
+function markBosses(d: Dungeon): Dungeon {
+  for (const f of d.floors) for (const r of f) {
+    if (r.kind === 'battle' && r.enemy?.foeRank === '強敵' && !r.eliteDone) {
+      r.hpRatio = Math.max(r.hpRatio ?? 1, DUNGEON.eliteHpRatio);
+      r.souls *= DUNGEON.eliteSoulsMult;
+      r.eliteDone = true;
+    }
+    if (r.kind !== 'boss' || !r.enemy) continue;
+    r.enemy.behavior ??= autoBehavior(loadout(r.enemy), r.enemy.deck);
+    r.enemy.foeRank = '主';
+  }
+  return d;
 }
 
 /** 長さと深さで tier を決め、その tier の中から1つ選ぶ */
@@ -138,7 +161,7 @@ export function generateDungeon(seed: string, level: number, cycle = 1): Dungeon
  */
 function withCycle(gen: Generator, seed: string, level: number, cycle: number): Dungeon {
   const c = Math.max(1, Math.floor(cycle));
-  if (c === 1) return gen(seed, level);
+  if (c === 1) return markBosses(gen(seed, level));
   const d = gen(seed, level + (c - 1) * DUNGEON.cycleLevelStep);
   const pool = CATACOMB_ACCESSORIES[d.catacombId] ?? [];
   d.floors.forEach((rooms, fi) => rooms.forEach((room, ri) => {
@@ -149,7 +172,7 @@ function withCycle(gen: Generator, seed: string, level: number, cycle: number): 
     const r = seededRng(`cycle:${d.catacombId}:${seed}:${c}:${fi}:${ri}`);
     if (r() < chance) room.extra = { kind: 'item', id: pick(r, pool), tier: 3 };
   }));
-  return { ...d, level, cycle: c };
+  return markBosses({ ...d, level, cycle: c });
 }
 
 /** 探索を再開するとき（入ったときの地下墓をそのまま作り直す） */
@@ -196,7 +219,7 @@ export function buildAbyss(key: string, seed: string, level: number): Dungeon {
       extra: crystalDrop(`abyss:${key}:${seed}:2`, key, 1),
     },
   ]];
-  return { catacombId: `abyss:${key}`, name: a.name, rank: '底', seed, level, floors, totalRooms: 3, quality: 0 };
+  return markBosses({ catacombId: `abyss:${key}`, name: a.name, rank: '底', seed, level, floors, totalRooms: 3, quality: 0 });
 }
 
 export { ABYSS_KEYS, SEA_KEY };
@@ -275,7 +298,7 @@ export function buildDeep(seed: string, level: number, salt: string): Dungeon {
     floors.push(rooms);
   }
   const totalRooms = floors.reduce((a, f) => a + f.length, 0);
-  return { catacombId: `abyss:${DEEP_KEY}`, name: DEEP.name, rank: '底', seed: s, level, floors, totalRooms, quality: 1, salt };
+  return markBosses({ catacombId: `abyss:${DEEP_KEY}`, name: DEEP.name, rank: '底', seed: s, level, floors, totalRooms, quality: 1, salt });
 }
 
 /** 淵結晶を落とすか（別の乱数で決める） */
@@ -299,7 +322,7 @@ export function buildSea(seed: string, level: number): Dungeon {
     return { kind: 'bonfire', souls: 0, loot: null };
   }));
   const totalRooms = floors.reduce((a, r) => a + r.length, 0);
-  return { catacombId: `abyss:${SEA_KEY}`, name: SEAFLOOR.name, rank: '底', seed, level, floors, totalRooms, quality: 1 };
+  return markBosses({ catacombId: `abyss:${SEA_KEY}`, name: SEAFLOOR.name, rank: '底', seed, level, floors, totalRooms, quality: 1 });
 }
 
 /* ---------------- 困難な地下墓 ---------------- */
@@ -319,10 +342,10 @@ export function buildFixed(key: string, level = 0): Dungeon {
     return { kind: 'bonfire', souls: 0, loot: null };
   }));
   const totalRooms = floors.reduce((a, r) => a + r.length, 0);
-  return {
+  return markBosses({
     catacombId: `fixed:${key}`, name: f.name, rank: f.rank, seed: f.seed, level,
     floors, totalRooms, quality: 1,
-  };
+  });
 }
 
 /* ---------------- 第1版の生成 ---------------- */
@@ -390,5 +413,5 @@ export function buildCatacomb(catacombId: string, seed: string, level: number): 
     if (cr() < chance) room.clue = pick(cr, Object.keys(FIXED_CATACOMBS));
   }));
 
-  return { catacombId, name: cat.name, rank: '通常', seed, level, floors, totalRooms, quality };
+  return markBosses({ catacombId, name: cat.name, rank: '通常', seed, level, floors, totalRooms, quality });
 }

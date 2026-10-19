@@ -1,3 +1,4 @@
+import { BEHAVIORS } from './behaviors';
 import type { EnemyDef, LootDef } from './catacombs';
 
 /**
@@ -32,14 +33,14 @@ const item = (id: string, tier: 1 | 2 | 3 = 3): LootDef => ({ kind: 'item', id, 
 const card = (id: string, tier: 1 | 2 | 3 = 3): LootDef => ({ kind: 'card', id, tier });
 
 const E = {
-  paladin: { name: '煤けた聖騎士', classId: 'vagabond', focus: { vit: 3, str: 4, end: 2, fai: 1 }, equip: { right: 'longsword', left: 'greatshield', ...iron } },
+  paladin: { name: '煤けた聖騎士', classId: 'vagabond', focus: { vit: 3, str: 4, end: 2, fai: 1 }, equip: { right: 'longsword', left: 'greatshield', ...iron }, elite: true, behavior: BEHAVIORS.paladin },
   cleric: { name: '大聖堂の司祭', classId: 'prophet', focus: { vit: 2, fai: 4, att: 2 }, equip: { right: 'longsword', left: 'prayer_seal', ...sage } },
   warden: { name: '大聖堂の門番', classId: 'hero', focus: { vit: 4, str: 3, dex: 2, end: 2 }, equip: { right: 'halberd', left: null, ...iron } },
   starfall: { name: '堕ちた星読み', classId: 'astrologer', focus: { vit: 3, int: 5, att: 2 }, equip: { right: 'dagger', left: 'star_staff', ...sage } },
-  templar: { name: '大聖堂の騎士', classId: 'vagabond', focus: { vit: 3, str: 2, dex: 2, end: 2 }, equip: { right: 'longsword', left: 'heater', ...knight } },
+  templar: { name: '大聖堂の騎士', classId: 'vagabond', focus: { vit: 3, str: 2, dex: 2, end: 2 }, equip: { right: 'longsword', left: 'heater', ...knight }, elite: true, behavior: BEHAVIORS.knight },
   archbishop: { name: '灰の大司教', classId: 'confessor', focus: { vit: 4, fai: 5, att: 2, end: 1 }, equip: { right: 'longsword', left: 'old_talisman', ...knight } },
 
-  oathKnight: { name: '血盟騎士', classId: 'confessor', focus: { vit: 3, str: 2, arc: 4, end: 2 }, equip: { right: 'oath_cleaver', left: 'oath_seal', ...knight } },
+  oathKnight: { name: '血盟騎士', classId: 'confessor', focus: { vit: 3, str: 2, arc: 4, end: 2 }, equip: { right: 'oath_cleaver', left: 'oath_seal', ...knight }, elite: true, behavior: BEHAVIORS.oathKnight },
   hunter: { name: '血に酔った狩人', classId: 'bandit', focus: { vit: 3, dex: 3, arc: 4 }, equip: { right: 'oath_saber', left: 'buckler', ...travel } },
   altarGuard: { name: '祭壇の番人', classId: 'hero', focus: { vit: 4, str: 3, arc: 3, end: 2 }, equip: { right: 'oath_cleaver', left: null, ...iron } },
   bloodPriest: { name: '血の司祭', classId: 'confessor', focus: { vit: 3, fai: 2, arc: 5, att: 2 }, equip: { right: 'oath_saber', left: 'oath_seal', ...sage } },

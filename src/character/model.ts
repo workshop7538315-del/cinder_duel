@@ -5,7 +5,7 @@ import { ARMORS, FISTS, SHIELDS, WEAPONS, WEIGHTS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { reqLabel } from '../engine/format';
 import { derive, levelCost, levelOf, meetsReq, unmetReq, weightKey } from '../engine/stats';
-import type { Accessory, ArmorSlot, Crystal, CrystalKey, Mods, Cut, HandItem, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
+import type { Accessory, ArmorSlot, Behavior, Crystal, CrystalKey, Mods, Cut, HandItem, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
 
 export type EquipSlot = 'right' | 'left' | ArmorSlot;
 export type Equip = Record<EquipSlot, string | null>;
@@ -39,6 +39,10 @@ export interface Character {
   accessories?: string[];
   /** 地下墓ごとに、踏破した周回の最高（CATACOMBS のキー → 周回） */
   cycles?: Record<string, number>;
+  /** 強敵・主の動き方（あるとパターンで動く。保存はしない） */
+  behavior?: Behavior;
+  /** 強敵か主か（behavior とあわせて使う） */
+  foeRank?: '強敵' | '主';
   /** NPC（地下墓の敵・練習試合の相手）。装備条件を無視して装備を使いこなす（保存はしない） */
   npc?: boolean;
   /** 知っている困難な地下墓（FIXED_CATACOMBS のキー）。手がかりで覚える */
