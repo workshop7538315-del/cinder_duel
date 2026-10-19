@@ -36,6 +36,10 @@ export interface RunState {
   looted?: string[];
   /** 倒れた回数 */
   deaths?: number;
+  /** この探索の間、バジリスクに下げられたレベル */
+  drain?: number;
+  /** 底に落ちたとき、入ろうとしていた困難な地下墓 */
+  from?: string;
 }
 
 export function startRun(charId: string, d: Dungeon): RunState {

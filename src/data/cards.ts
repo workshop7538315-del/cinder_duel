@@ -17,10 +17,21 @@ export interface CardDef {
   school?: School;
   /** エンチャント（重ね掛け不可。エンチャントできない武器には使えない） */
   enchant?: { bonus?: number; bleed?: number };
+  /** 使うときに手札から選んで捨てる枚数（min〜max） */
+  discard?: { min: number; max: number };
+  /** 自分では使えない（捨てられたときにだけ発動する） */
+  unplayable?: boolean;
+  /** 捨てられたときに発動する */
+  onDiscard?: { text: string; run: (b: Battle, user: Fighter, foe: Fighter) => Promise<void> | void };
   /** NPCの判断用 */
   role: 'attack' | 'heal' | 'buff' | 'utility';
   text: (user: Fighter | null) => string;
-  run: (b: Battle, user: Fighter, foe: Fighter) => Promise<void> | void;
+  run: (b: Battle, user: Fighter, foe: Fighter, ctx: CardContext) => Promise<void> | void;
+}
+
+export interface CardContext {
+  /** 使うときに捨てたカードの枚数 */
+  discarded: number;
 }
 
 const KNIFE: Scaling = { base: 6, scale: { dex: 0.3 } };
@@ -37,6 +48,8 @@ const spell = (f: Fighter | null, school: School, base: number, mult = 1): numbe
   return p === null ? null : base + Math.floor(p * mult);
 };
 const num = (v: number | null, fallback: string) => (v === null ? fallback : String(v));
+
+const NO_COST: Cost = { t: 'sum', n: 99 };
 
 export const CARDS: Record<string, CardDef> = {
   flask: {
@@ -116,6 +129,85 @@ export const CARDS: Record<string, CardDef> = {
     text: (f) => `物理${num(spell(f, 'incant', 8, 1.2), '8+聖印×1.2')}・出血${f ? scaled(FEAST_BLEED, f.stats) : FEAST_BLEED.base}の攻撃。${scaleLabel(FEAST_BLEED).replace('補正', '出血補正')}`,
     run: (b, f, o) =>
       b.strike(f, o, { label: '鮮血の渦', dmg: spell(f, 'incant', 8, 1.2) ?? 0, type: 'phys', bleed: scaled(FEAST_BLEED, f.stats) }),
+  },
+
+  // ---- 底の魔術（手札を選んで捨てて使う） ----
+  quake: {
+    name: '地鳴り', kind: '魔術', role: 'attack', school: 'sorcery', cost: { t: 'sum', n: 3 }, fp: 3, req: { int: 14 },
+    discard: { min: 1, max: 2 },
+    text: (f) => `手札を1〜2枚捨てる。魔力${num(spell(f, 'sorcery', 5, 0.8), '5+杖×0.8')}＋捨てた枚数×6の攻撃。`,
+    run: (b, f, o, ctx) =>
+      b.strike(f, o, { label: '地鳴り', dmg: (spell(f, 'sorcery', 5, 0.8) ?? 0) + ctx.discarded * 6, type: 'magic' }),
+  },
+  shipwreck: {
+    name: '難破', kind: '魔術', role: 'utility', school: 'sorcery', cost: { t: 'face', f: [2, 4, 6] }, fp: 2, req: { int: 12 },
+    discard: { min: 1, max: 3 },
+    text: (f) => `手札を1〜3枚捨て、捨てた枚数＋1枚引く。そのあと魔力${num(spell(f, 'sorcery', 4, 0.5), '4+杖×0.5')}の攻撃。`,
+    run: async (b, f, o, ctx) => {
+      const got = Array.from({ length: ctx.discarded + 1 }, () => b.draw(f)).filter(Boolean).length;
+      b.log(`カードを${got}枚引いた。`, b.side(f));
+      await b.strike(f, o, { label: '難破', dmg: spell(f, 'sorcery', 4, 0.5) ?? 0, type: 'magic' });
+    },
+  },
+  gale: {
+    name: '谷風', kind: '魔術', role: 'attack', school: 'sorcery', cost: { t: 'face', f: [1, 3, 5] }, fp: 3, req: { int: 16 },
+    discard: { min: 1, max: 1 },
+    text: (f) => `手札を1枚捨てる。魔力${num(spell(f, 'sorcery', 8, 1), '8+杖')}の攻撃。ガードできない。`,
+    run: (b, f, o) => b.strike(f, o, { label: '谷風', dmg: spell(f, 'sorcery', 8, 1) ?? 0, type: 'magic', unguardable: true }),
+  },
+  tide: {
+    name: '水底の帳', kind: '魔術', role: 'heal', school: 'sorcery', cost: { t: 'sum', n: 4 }, fp: 4, req: { int: 15 },
+    discard: { min: 1, max: 2 },
+    text: (f) => `手札を1〜2枚捨てる。HPを（${num(spell(f, 'sorcery', 6, 0.5), '6+杖×0.5')}）×捨てた枚数回復する。`,
+    run: (b, f, _o, ctx) => b.heal(f, (spell(f, 'sorcery', 6, 0.5) ?? 0) * ctx.discarded),
+  },
+
+  // ---- 底の道具（自分では使えず、捨てられると発動する） ----
+  fossil: {
+    name: '割れた化石', kind: 'アイテム', role: 'utility', cost: NO_COST, unplayable: true,
+    text: () => '使えない。捨てられると、相手に物理10（リアクションできない）。',
+    onDiscard: {
+      text: '相手に物理10',
+      run: (b, f, o) => b.strike(f, o, { label: '割れた化石', dmg: 10, type: 'phys', noReaction: true }),
+    },
+    run: () => {},
+  },
+  barrel: {
+    name: '浸水した樽', kind: 'アイテム', role: 'utility', cost: NO_COST, unplayable: true,
+    text: () => '使えない。捨てられると、スタミナダイス+2（上限まで）。',
+    onDiscard: {
+      text: 'スタミナダイス+2',
+      run: (b, f) => {
+        const before = f.stamina;
+        f.stamina = Math.min(f.stMax, f.stamina + 2);
+        b.log(`スタミナダイス+${f.stamina - before}。`, b.side(f));
+      },
+    },
+    run: () => {},
+  },
+  feather: {
+    name: '谷の羽根', kind: 'アイテム', role: 'utility', cost: NO_COST, unplayable: true,
+    text: () => '使えない。捨てられると、カードを2枚引く。',
+    onDiscard: {
+      text: '2枚引く',
+      run: (b, f) => {
+        const got = [b.draw(f), b.draw(f)].filter((x): x is string => !!x).map((x) => CARDS[x].name);
+        b.log(`カードを引いた：${got.join('、') || 'なし'}`, b.side(f));
+      },
+    },
+    run: () => {},
+  },
+  droplet: {
+    name: '水底の雫', kind: 'アイテム', role: 'utility', cost: NO_COST, unplayable: true,
+    text: () => '使えない。捨てられると、最大HPの15%とFP3を回復する。',
+    onDiscard: {
+      text: 'HP15%・FP3回復',
+      run: (b, f) => {
+        b.heal(f, Math.round(f.maxHp * 0.15));
+        f.fp = Math.min(f.maxFp, f.fp + 3);
+      },
+    },
+    run: () => {},
   },
 
   breath: {

@@ -1,5 +1,6 @@
 import { autoAlloc, autoDeck, inventoryOf, loadout, type Character } from '../character/model';
 import { CATACOMB_ORDER, CATACOMBS, DUNGEON, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
+import { ABYSS, ABYSSES, BASILISK } from '../data/abyss';
 import { FIXED, FIXED_CATACOMBS } from '../data/fixed';
 import { pick, pickWeighted, randInt, seededRng, type SeededRng } from './rng';
 
@@ -23,8 +24,8 @@ export interface Dungeon {
   /** 通常の地下墓は CATACOMBS のキー、困難な地下墓は "fixed:キー" */
   catacombId: string;
   name: string;
-  /** 困難な地下墓なら '困難' */
-  rank: '通常' | '困難';
+  /** 困難な地下墓なら '困難'、底なら '底' */
+  rank: '通常' | '困難' | '底';
   seed: string;
   /** 生成したときの自分のレベル（敵の強さの基準） */
   level: number;
@@ -111,6 +112,7 @@ export function generateDungeon(seed: string, level: number): Dungeon {
 /** 探索を再開するとき（入ったときの地下墓をそのまま作り直す） */
 export function rebuildDungeon(catacombId: string, seed: string, level: number): Dungeon {
   if (catacombId.startsWith('fixed:')) return buildFixed(catacombId.slice(6));
+  if (catacombId.startsWith('abyss:')) return buildAbyss(catacombId.slice(6), seed, level);
   const gen = GENERATORS[seedVersion(seed)] ?? GENERATORS[1];
   const d = gen(seed, level);
   return d.catacombId === catacombId ? d : buildCatacomb(catacombId, seed, level);
@@ -125,6 +127,35 @@ export function strayInto(rand: () => number = Math.random): string | null {
 
 /** 新しく作るシード（今の版の印つき） */
 export const versionedSeed = (body: string): string => `${CURRENT_SEED_VERSION}-${body}`;
+
+/* ---------------- 底 ---------------- */
+
+/** 底を作る。バジリスク2体（レベル+5）と盗掘者狩り（レベル+10）の1階層3部屋 */
+export function buildAbyss(key: string, seed: string, level: number): Dungeon {
+  const a = ABYSSES[key];
+  const r = seededRng(`abyss:${key}:${seed}`);
+  const bl = Math.max(1, level + ABYSS.basiliskLevelBonus);
+  const hl = Math.max(1, level + ABYSS.hunterLevelBonus);
+  const basilisk = (ri: number): Room => ({
+    kind: 'battle', enemy: buildEnemy(BASILISK, bl, `abyss:${key}:${seed}:${ri}`), hpRatio: ABYSS.basiliskHpRatio,
+    souls: ABYSS.basiliskSouls, loot: r() < ABYSS.basiliskDropChance ? pick(r, a.loot) : null,
+  });
+  const floors: Room[][] = [[
+    basilisk(0),
+    basilisk(1),
+    {
+      kind: 'boss', enemy: buildEnemy({ ...a.hunter, name: `${a.hunter.name}（${a.name}）` }, hl, `abyss:${key}:${seed}:2`),
+      hpRatio: ABYSS.hunterHpRatio, souls: ABYSS.hunterSouls, loot: pick(r, a.loot),
+    },
+  ]];
+  return { catacombId: `abyss:${key}`, name: a.name, rank: '底', seed, level, floors, totalRooms: 3, quality: 0 };
+}
+
+/** どの底に落ちるか */
+export const pickAbyss = (rand: () => number = Math.random): string => {
+  const keys = Object.keys(ABYSSES);
+  return keys[Math.floor(rand() * keys.length)];
+};
 
 /* ---------------- 困難な地下墓 ---------------- */
 

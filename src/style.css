@@ -273,6 +273,11 @@ button.die{padding:7px}
 .btns button.primary{background:#3a2c1a;border-color:var(--ember);font-weight:700}
 .btns button:disabled{opacity:.38;cursor:default}
 .btns button small{color:var(--muted);font-size:12px}
+.pick-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px;max-height:50vh;overflow-y:auto}
+.pick{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px;text-align:left;display:flex;flex-direction:column;gap:2px}
+.pick b{font-family:var(--display);font-size:14px}
+.pick small{font-size:11px;color:var(--muted)}
+.pick.on{border-color:var(--blood);background:#2c1517}
 .btns button.special{flex-direction:column;align-items:flex-start;background:#2c1517;border-color:var(--blood)}
 .btns button.special small{text-align:left}
 .safe{color:#b4cc9e}

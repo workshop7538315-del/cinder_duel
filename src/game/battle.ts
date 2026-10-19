@@ -3,12 +3,13 @@ import { RULES } from '../data/rules';
 import { findPayment, isValidPayment, stageCost } from '../engine/cost';
 import { rollDice, rollMany } from '../engine/dice';
 import {
-  addBleed, applyArmor, catalystFor, dodgeCost, drawCard, enchantBleed, enchantBonus, guardCost, guardCut, spend,
+  addBleed, addCurse, applyArmor, catalystFor, drainLevel, dodgeCost, drawCard, enchantBleed, enchantBonus, guardCost, guardCut, spend,
   weaponBleed, weaponDamage,
 } from '../engine/fighter';
+import { STAT_NAMES } from '../data/classes';
 import { costLabel, typeName } from '../engine/format';
 import type { Attack, Cost, Die, Fighter, WeaponArt } from '../engine/types';
-import { npcDraws, npcReactChoice, npcReactDice, npcTurn } from './ai';
+import { npcDiscards, npcDraws, npcReactChoice, npcReactDice, npcTurn } from './ai';
 
 export type Reaction = 'dodge' | 'guard' | 'take' | 'art';
 export type LogKind = 'round' | 'sys' | 'me' | 'foe' | 'hit' | 'guard' | 'dodge';
@@ -47,6 +48,8 @@ export interface BattleIO {
   /** リアクションで振る個数（0 = 振らずに受ける。max が 0 なら受けるしかない） */
   askReactDice(hit: IncomingHit, max: number): Promise<number>;
   askReactChoice(hit: IncomingHit, dice: Die[], canDodge: boolean, canGuard: boolean, canArt: boolean): Promise<Reaction>;
+  /** 手札から捨てるカードを選ぶ（hand の添字を返す） */
+  askDiscard(hand: string[], min: number, max: number, cardName: string): Promise<number[]>;
   /** 反撃の好機に振る個数（0 = 見送る） */
   askCounter(info: CounterInfo, max: number): Promise<number>;
   finished(playerWon: boolean): void;
@@ -64,7 +67,9 @@ export interface SpecialAction {
 export function cardUnusable(f: Fighter, id: string): string | null {
   const c = CARDS[id];
   if (!c) return '不明なカードです。';
+  if (c.unplayable) return '捨てられたときにだけ発動するカードです。';
   if (c.fp && f.fp < c.fp) return 'FPが足りません。';
+  if (c.discard && f.hand.length - 1 < c.discard.min) return `ほかに捨てる手札が${c.discard.min}枚必要です。`;
   if (c.enchant && f.right.noEnchant) return `${f.right.name}にはエンチャントできません。`;
   if (c.school && !catalystFor(f, c.school)) return c.school === 'sorcery' ? '杖を持っていません。' : '聖印かタリスマンを持っていません。';
   return null;
@@ -125,6 +130,7 @@ export class Battle {
         f.stamina = this.round === 1 ? f.stInit : Math.min(f.stMax, f.stamina + RULES.staminaRecovery);
         f.buffs.broken = false;
         f.bleed = Math.max(0, f.bleed - RULES.bleedDecay);
+        f.curse = Math.max(0, (f.curse ?? 0) - RULES.curseDecay);
       }
       this.log(`ラウンド ${this.round}`, 'round');
       this.update();
@@ -272,6 +278,7 @@ export class Battle {
     f.chain++;
     await this.strike(f, o, {
       label: `${w.name}・${f.chain}段目`, dmg: weaponDamage(f, w.dmg), type: w.type, weapon: true, bleed: weaponBleed(f, w.bleed),
+      curse: w.curse,
     });
   }
 
@@ -283,6 +290,7 @@ export class Battle {
     f.chain = 0;
     await this.strike(f, o, {
       label: a.name, dmg: weaponDamage(f, a.dmg), type: a.type, weapon: true, unguardable: a.unguardable, bleed: weaponBleed(f, a.bleed),
+      curse: a.curse, drain: a.drain,
     });
   }
 
@@ -297,8 +305,31 @@ export class Battle {
     this.update();
     const isAttack = c.role === 'attack';
     if (isAttack) await this.afterAction(f, true);
-    await c.run(this, f, o);
+    const discarded = c.discard ? await this.discardFor(f, o, c.discard.min, c.discard.max, c.name) : 0;
+    if (!this.over) await c.run(this, f, o, { discarded });
     if (!isAttack) await this.afterAction(f, false);
+  }
+
+  /** 手札から選んで捨てる。捨てられて発動するカードはここで発動する。捨てた枚数を返す */
+  private async discardFor(f: Fighter, o: Fighter, min: number, max: number, name: string): Promise<number> {
+    const n = Math.min(max, f.hand.length);
+    if (n < min) return 0;
+    const picks = f.isPlayer ? await this.io.askDiscard([...f.hand], min, n, name) : npcDiscards(f.hand, min, n);
+    const ids = [...new Set(picks)].filter((i) => i >= 0 && i < f.hand.length).slice(0, n).map((i) => f.hand[i]);
+    for (const id of ids) {
+      f.hand.splice(f.hand.indexOf(id), 1);
+      f.discard.push(id);
+    }
+    this.log(`${this.who(f)}は${ids.map((id) => `「${CARDS[id].name}」`).join('')}を捨てた。`, this.side(f));
+    this.update();
+    for (const id of ids) {
+      const tr = CARDS[id].onDiscard;
+      if (tr && !this.over) {
+        this.log(`「${CARDS[id].name}」が発動した。`, this.side(f));
+        await tr.run(this, f, o);
+      }
+    }
+    return ids.length;
   }
 
   /* ---------------- 攻撃とリアクション ---------------- */
@@ -333,9 +364,30 @@ export class Battle {
       this.io.flash(def);
       atk.onHit?.(def);
       this.applyBleed(att, def, atk, r === 'guard');
+      this.applyCurse(def, atk, r === 'guard');
     }
     this.update();
     if (def.hp <= 0) this.finish(att);
+  }
+
+  /** 呪死を溜め、溜まりきったら即死。レベルを下げる攻撃ならレベルを1下げる */
+  private applyCurse(def: Fighter, atk: Attack, guarded: boolean): void {
+    if (def.hp <= 0) return;
+    if (atk.drain && !guarded) {
+      const before = def.stats;
+      const k = drainLevel(def);
+      this.log(`${this.who(def)}のレベルが下がった（${STAT_NAMES[k]} ${before[k]}→${def.stats[k]}）。`, 'hit');
+    }
+    let amount = atk.curse ?? 0;
+    if (guarded) amount = Math.floor(amount * RULES.curseGuardRatio);
+    if (amount <= 0) return;
+    if (addCurse(def, amount)) {
+      def.hp = 0;
+      this.log(`${this.who(def)}は呪死した。`, 'hit');
+      this.io.flash(def);
+    } else {
+      this.log(`${this.who(def)}に呪死が溜まった（${def.curse}/${RULES.curseThreshold}）。`);
+    }
   }
 
   /** 当たった攻撃の出血を溜め、弾けたらダメージ */

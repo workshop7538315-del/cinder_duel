@@ -58,6 +58,14 @@ export async function npcTurn(b: Battle, e: Fighter, p: Fighter): Promise<void> 
   }
 }
 
+/** 捨てるカードを選ぶ（捨てて発動するカードを優先し、あとは使いにくいものから） */
+export function npcDiscards(hand: string[], min: number, max: number): number[] {
+  const score = (id: string) => (CARDS[id]?.onDiscard ? 0 : CARDS[id]?.unplayable ? 1 : CARDS[id]?.role === 'utility' ? 2 : 3);
+  const order = hand.map((id, i) => [i, score(id)] as const).sort((a, b) => a[1] - b[1]);
+  const triggers = order.filter(([i]) => CARDS[hand[i]]?.onDiscard).length;
+  return order.slice(0, Math.max(min, Math.min(max, triggers))).map(([i]) => i);
+}
+
 /** リアクションで振る個数（0 = 受ける） */
 export function npcReactDice(def: Fighter, hit: IncomingHit): number {
   if (hit.raw <= 4) return 0;
