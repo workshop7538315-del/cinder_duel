@@ -54,6 +54,7 @@ function panelHTML(b: Battle, f: Fighter): string {
   if (b.counter?.owner === f) chips.push(`<span class="chip turn">反撃の構え</span>`);
   if (f.buffs.broken) chips.push(`<span class="chip debuff">体勢崩し</span>`);
   if (f.bleed) chips.push(`<span class="chip debuff">出血 ${f.bleed}/${RULES.bleedThreshold}</span>`);
+  if (f.reactPool?.length) chips.push(`<span class="chip buff">ためた出目 ${f.reactPool.map((d) => d.v).join('・')}</span>`);
   if (f.curse) chips.push(`<span class="chip debuff">呪死 ${f.curse}/${RULES.curseThreshold}</span>`);
   const md = !f.isPlayer && f.action.length
     ? `<span class="minidice">${f.action.map((d) => dieHTML(d.v)).join('')}</span>` : '';
@@ -198,11 +199,20 @@ const io: BattleIO = {
     return k === -2 ? 'special' : Math.max(0, k);
   },
 
-  async askReactDice(hit, max) {
+  async askReactDice(hit, max, pool) {
+    const kept = pool.length
+      ? `<p class="note">ためてある出目：</p><div class="dice">${pool.map((d) => dieHTML(d.v)).join('')}</div>` : '';
+    if (pool.length && max === 0) return 0;
     if (max === 0) {
       await modal(reactHead(hit) + `<p class="note">スタミナダイスが残っていない。</p>
         <div class="btns"><button type="button" class="primary" data-v="t">受ける</button></div>`);
       return 0;
+    }
+    if (pool.length) {
+      return askCount({
+        head: reactHead(hit) + kept + '<p class="note">ためてある出目に足して振れます（0個ならためてある出目だけで守る）。</p>',
+        max, def: 0, btn: '振って守る', alt: '受ける',
+      });
     }
     const k = await askCount({ head: reactHead(hit), max, def: Math.min(max, 2), btn: 'まとめて振る', alt: '振らずに受ける' });
     return Math.max(0, k);
@@ -213,7 +223,7 @@ const io: BattleIO = {
     const dodgeLabel = hit.dodgeCost === null ? '回避できない' : `回避 [${hit.dodgeCost}]`;
     const v = await modal(`<p class="eyebrow">リアクション</p><h3>出目：${dice.map((d) => d.v).join('・')}</h3>
       <div class="dice">${dice.map((d) => dieHTML(d.v, 'new')).join('')}</div>
-      <p class="note">使わなかったダイスは消えます。</p>
+      <p class="note">使わなかった出目は、この相手の手番のあいだ次のリアクションのためにためておけます。相手の手番が終わると、スタミナダイスに戻ります。</p>
       <div class="btns">
         <button type="button" data-v="dodge" class="${canDodge ? 'primary' : ''}" ${canDodge ? '' : 'disabled'}>${dodgeLabel}<small>0ダメージ</small></button>
         <button type="button" data-v="guard" ${canGuard ? '' : 'disabled'}>${ung ? 'ガード不可' : `ガード [${hit.guardCost}]`}<small>${ung ? '' : hit.guardDmg + 'ダメージ'}</small></button>
@@ -232,13 +242,19 @@ const io: BattleIO = {
     );
   },
 
-  async askCounter(info, max) {
-    const k = await askCount({
-      head: `<p class="eyebrow">反撃の好機</p><h3>${esc(info.target.name)}に隙がある</h3>
-        <p class="note">スタミナダイスを振り、${costLabel(info.cost)}を払えれば「${info.art.name}」で反撃する（リアクション不可）。</p>`,
-      max, def: Math.min(max, 2), btn: 'まとめて振る', alt: '見送る',
+  async askCounter(info, max, pool) {
+    const kept = pool.length ? `<p class="note">ためてある出目：</p><div class="dice">${pool.map((d) => dieHTML(d.v)).join('')}</div>` : '';
+    if (max === 0 && pool.length) {
+      const v = await modal(`<p class="eyebrow">反撃の好機</p><h3>${esc(info.target.name)}に隙がある</h3>${kept}
+        <p class="note">ためてある出目で${costLabel(info.cost)}を払えれば「${info.art.name}」で反撃する。</p>
+        <div class="btns"><button type="button" class="primary" data-v="y">反撃する</button><button type="button" data-v="n">見送る</button></div>`);
+      return v === 'y' ? 0 : -1;
+    }
+    return askCount({
+      head: `<p class="eyebrow">反撃の好機</p><h3>${esc(info.target.name)}に隙がある</h3>${kept}
+        <p class="note">スタミナダイスを振り（ためてある出目も使える）、${costLabel(info.cost)}を払えれば「${info.art.name}」で反撃する（リアクション不可）。</p>`,
+      max, def: pool.length ? 0 : Math.min(max, 2), btn: 'まとめて振る', alt: '見送る',
     });
-    return Math.max(0, k);
   },
 
   finished(playerWon) {

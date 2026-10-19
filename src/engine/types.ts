@@ -238,6 +238,8 @@ export interface Fighter {
   speedRoll: number[];
   /** 手番／リアクションで振った行動ダイス */
   action: Die[];
+  /** 相手の手番のあいだ、リアクションで振って使わなかった出目（次のリアクションに使える。相手の手番が終わるとスタミナに戻る） */
+  reactPool?: Die[];
   hand: string[];
   deck: string[];
   discard: string[];
