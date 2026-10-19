@@ -70,7 +70,14 @@ export function guardCut(f: Fighter, type: DamageType): number {
   return Math.min(1, c);
 }
 
-export const dodgeCost = (f: Fighter): number | null => f.weight.dodge;
+/** 回避の追加コストが1上がるダメージの幅（自分のレベルで広がる） */
+export const dodgeBand = (level: number): number => Math.round(RULES.dodgeBandBase + level * RULES.dodgeBandPerLevel);
+
+/** 回避のコスト: 重さの区分の値 ＋ 受けるはずのダメージに応じた追加（過重なら null） */
+export function dodgeCost(f: Fighter, raw = 0): number | null {
+  if (f.weight.dodge === null) return null;
+  return f.weight.dodge + Math.min(RULES.dodgeExtraMax, Math.floor(Math.max(0, raw) / dodgeBand(f.level)));
+}
 
 /** 防具のカット率で減らす（最低1） */
 export function applyArmor(def: Fighter, type: DamageType, raw: number): number {

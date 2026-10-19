@@ -69,3 +69,22 @@ describe('戦闘', () => {
     expect(inBand(30, 46)).toBe(false);
   });
 });
+
+import { dodgeBand, dodgeCost } from '../src/engine/fighter';
+import { RULES as R } from '../src/data/rules';
+
+describe('回避のコスト', () => {
+  it('受けるはずのダメージが幅を超えるごとに+1（上限あり）。幅はレベルで広がる', async () => {
+    const { makeFighter } = await import('../src/game/setup');
+    const { newCharacter } = await import('../src/character/model');
+    const f = makeFighter(newCharacter('samurai'), true);
+    const base = f.weight.dodge!;
+    const w = dodgeBand(f.level);
+    expect(dodgeCost(f, 0)).toBe(base);
+    expect(dodgeCost(f, w - 1)).toBe(base);
+    expect(dodgeCost(f, w)).toBe(base + 1);
+    expect(dodgeCost(f, w * 2)).toBe(base + 2);
+    expect(dodgeCost(f, 9999)).toBe(base + R.dodgeExtraMax);
+    expect(dodgeBand(80)).toBeGreaterThan(dodgeBand(10));
+  });
+});

@@ -153,12 +153,19 @@ async function command(fn: (ids: number[]) => Promise<string | null>): Promise<v
 
 /* ---------------- 入出力（Battle → 画面） ---------------- */
 
+/** 回避の追加コストの内訳（重さの分＋ダメージの分） */
+function dodgeExtra(hit: IncomingHit): string {
+  const base = B?.p.weight.dodge;
+  if (hit.dodgeCost === null || base == null || hit.dodgeCost === base) return '';
+  return `（重さ${base}＋大きな一撃+${hit.dodgeCost - base}）`;
+}
+
 function reactHead(hit: IncomingHit): string {
   const o = hit.attack;
   return `<p class="eyebrow">リアクション</p><h3>${esc(hit.attacker.name)}の${o.label}</h3>
     <p class="incoming">${typeName(o.type)} <b>${hit.raw}</b>${o.unguardable ? '　ガード不可' : ''}</p>
     ${o.curse || o.drain ? `<p class="stain-note">${o.curse ? `当たると呪死が${o.curse}溜まる（${RULES.curseThreshold}で即死。今 ${hit.attacker === B?.e ? B.p.curse ?? 0 : 0}）。` : ''}${o.drain ? '呪死するとレベルを1失う。' : ''}回避すれば防げる。</p>` : ''}
-    <ul class="opts"><li>${hit.dodgeCost === null ? '過重のため回避できない' : `回避 [${hit.dodgeCost}] → 0ダメージ`}</li>
+    <ul class="opts"><li>${hit.dodgeCost === null ? '過重のため回避できない' : `回避 [${hit.dodgeCost}] → 0ダメージ${dodgeExtra(hit)}`}</li>
     <li>${o.unguardable ? 'ガードはできない' : `ガード [${hit.guardCost}] → ${hit.guardDmg}ダメージ（カット${Math.round(hit.guardCut * 100)}%）`}</li>
     ${hit.art ? `<li>戦技「${hit.art.name}」${costLabel(hit.art.cost, hit.art.fp)} → 回避して反撃の構え</li>` : ''}</ul>`;
 }

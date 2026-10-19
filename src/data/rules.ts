@@ -38,6 +38,11 @@ export const RULES = {
   drawCost: 1, // ドローに払うスタミナダイス
   handStart: 4,
 
+  // 回避のコスト = 重さの区分の値 + 追加。追加は、受けるはずのダメージが「幅」を1つ超えるごとに+1（最大 dodgeExtraMax）。
+  // 幅 = dodgeBandBase + 自分のレベル × dodgeBandPerLevel（レベルが上がるとダメージも上がるので、幅も広がる）
+  dodgeBandBase: 14,
+  dodgeBandPerLevel: 0.15,
+  dodgeExtraMax: 3,
   // ガード消費 = guardBase + 受けるはずのダメージ ÷ guardPer
   guardBase: 1,
   guardPer: 6,
