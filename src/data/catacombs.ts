@@ -140,10 +140,14 @@ export const DUNGEON = {
   /** 敵の最大HPの倍率（部屋をまたいでHPを持ち越すので、道中の敵は控えめ） */
   enemyHpRatio: 0.5,
   bossHpRatio: 1,
+  /** 途中の階層の主（そのあとに篝火があるので、地下墓の主より控えめ） */
+  floorBossHpRatio: 0.75,
   /** ソウル = base + 敵のレベル × perLevel（主は ×bossMult） */
   soulsBase: 40,
   soulsPerLevel: 10,
   bossMult: 3,
+  /** 途中の階層の主のソウル倍率 */
+  floorBossMult: 2,
   /** 戦闘部屋で敵が物を落とす確率 */
   dropChance: 0.35,
   /** 宝箱がソウルだった場合の量 = 自分のレベル × chestSoulsPerLevel */

@@ -27,7 +27,7 @@ describe('地下墓の生成', () => {
       }
     }
   });
-  it('1〜3階層、各3〜5部屋。最後は主、途中の階層の最後は篝火', () => {
+  it('1〜3階層、各3〜5部屋。各階層の最後は主で、途中の階層は主のあとに篝火', () => {
     for (const id of Object.keys(CATACOMBS)) {
       for (const s of seeds.slice(0, 40)) {
         const d = buildCatacomb(id, s, 30);
@@ -37,7 +37,10 @@ describe('地下墓の生成', () => {
           expect(f.length).toBeGreaterThanOrEqual(DUNGEON.roomsMin);
           expect(f.length).toBeLessThanOrEqual(DUNGEON.roomsMax);
           expect(f[0].kind).toBe('battle');
-          expect(f[f.length - 1].kind).toBe(fi === d.floors.length - 1 ? 'boss' : 'bonfire');
+          const last = fi === d.floors.length - 1;
+          expect(f[f.length - 1].kind).toBe(last ? 'boss' : 'bonfire');
+          if (!last) expect(f[f.length - 2].kind).toBe('boss');
+          expect(f.filter((r) => r.kind === 'boss')).toHaveLength(1);
         });
       }
     }
@@ -144,7 +147,7 @@ describe('血痕（倒れたときのソウル）', () => {
     expect(r.souls).toBe(before + run.souls);
     expect(r.stain).toBeNull();
   });
-  it('回収しないまま勝つと失われる。もう一度倒れても失われる', () => {
+  it('回収しないまま勝っても取り戻せる。回収前にもう一度倒れると失われる', () => {
     const run = toSecondBattle();
     const dead = loseBattle(run);
     // もう一度倒れる（1部屋目で）
@@ -155,6 +158,7 @@ describe('血痕（倒れたときのソウル）', () => {
     while (!stainHere(r)) r = currentRoom(d, r)!.kind === 'chest' ? openChest(d, r) : currentRoom(d, r)!.kind === 'bonfire' ? leaveBonfire(d, r) : winBattle(d, r, 50, 5);
     const won = winBattle(d, r, 50, 5);
     expect(won.stain).toBeNull();
+    expect(won.souls).toBe(r.souls + run.souls + currentRoom(d, r)!.souls);
   });
   it('宝箱と落とし物は一度きり。敵のソウルはやり直すたびに得られる', () => {
     const cd = buildCatacomb('knight', 'chest-a', 30);
@@ -175,5 +179,35 @@ describe('血痕（倒れたときのソウル）', () => {
     const c = newCharacter('vagabond');
     const run = toSecondBattle();
     expect(bankRun(c, abandon(run)).character).toBe(c);
+  });
+});
+
+describe('退却で持ち帰れるもの', () => {
+  it('主を倒した階層で拾ったものだけ。ソウルはすべて', () => {
+    const c = newCharacter('vagabond');
+    const d = buildCatacomb('knight', 'retreat', 30);
+    const run = {
+      ...startRun(c.id, d), status: 'retreated' as const, souls: 300, bossDown: [0],
+      loot: [
+        { kind: 'item' as const, id: 'greatshield', tier: 3 as const, floor: 0 },
+        { kind: 'item' as const, id: 'halberd', tier: 3 as const, floor: 1 },
+      ],
+    };
+    const { character, banked } = bankRun(c, run);
+    expect(banked.items).toEqual(['greatshield']);
+    expect(banked.left.map((l) => l.id)).toEqual(['halberd']);
+    expect(character.inventory.items).not.toContain('halberd');
+    expect(banked.souls).toBe(300);
+  });
+  it('途中の階層の主を倒すと、その階層は持ち帰れるようになる（倒れても消えない）', () => {
+    let d = buildCatacomb('knight', 'x0', 30);
+    for (let i = 1; d.floors.length < 2; i++) d = buildCatacomb('knight', `x${i}`, 30);
+    let run = startRun('c', d);
+    while (run.floor === 0) {
+      const k = currentRoom(d, run)!.kind;
+      run = k === 'chest' ? openChest(d, run) : k === 'bonfire' ? leaveBonfire(d, run) : winBattle(d, run, 50, 5);
+    }
+    expect(run.bossDown).toEqual([0]);
+    expect(loseBattle(run).bossDown).toEqual([0]);
   });
 });

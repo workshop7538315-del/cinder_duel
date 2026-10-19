@@ -6,7 +6,7 @@ import { buildCatacomb, generateDungeon, normalizeSeed, ROOM_NAMES, type Dungeon
 import { randomSeed } from '../dungeon/rng';
 import {
   abandon, bankRun, currentRoom, isLooted, leaveBonfire, loseBattle, openChest, rest, retreat, retrieveStain, roomNumber,
-  stainHere, startRun, winBattle,
+  securedLoot, stainHere, startRun, winBattle,
   type Banked, type RunState,
 } from '../dungeon/run';
 import { clearRun, loadRun, loadSeedHistory, rememberSeed, saveRun } from '../dungeon/save';
@@ -132,16 +132,21 @@ function renderRun(): void {
     <div class="ph"><span class="nm">${esc(c.name)} <small>Lv${lo.level}</small></span><span class="wt">持ち帰り予定 ソウル ${run.souls}</span></div>
     <div class="row"><span class="lbl">HP</span>${bar('hp', hp, maxHp)}<span class="num">${hp}/${maxHp}</span></div>
     <div class="row"><span class="lbl">FP</span>${bar('fp', fp, maxFp)}<span class="num">${fp}/${maxFp}</span></div>
-    ${run.loot.length ? `<p class="note">拾ったもの：${run.loot.map(lootName).join('、')}</p>` : ''}
+    ${run.loot.length ? `<p class="note">拾ったもの：${run.loot.map((l) => {
+      const safe = securedLoot({ ...run!, status: 'retreated' }).includes(l);
+      return `<span class="${safe ? 'safe' : 'unsafe'}" title="${safe ? '退却しても持ち帰れる' : 'この階層の主を倒すまで、退却では持ち帰れない'}">${lootName(l)}${safe ? '✓' : ''}</span>`;
+    }).join('、')}</p>
+    <p class="note dim">✓ は主を倒した階層で拾ったもの。退却で持ち帰れるのはこれだけです。</p>` : ''}
   </div>`;
 
   const room = currentRoom(dungeon, run)!;
   let action = '';
   if (room.kind === 'battle' || room.kind === 'boss') {
     const e = room.enemy!;
-    action = `<div class="room-card rk-${room.kind}"><p class="eyebrow">${room.kind === 'boss' ? 'この地下墓の主' : '敵'}</p>
+    const finalBoss = room.kind === 'boss' && run.floor === dungeon.floors.length - 1;
+    action = `<div class="room-card rk-${room.kind}"><p class="eyebrow">${room.kind === 'boss' ? (finalBoss ? 'この地下墓の主' : `地下${run.floor + 1}層の主`) : '敵'}</p>
       <b>${esc(e.name)}</b><span>Lv${charLevel(e)}・${[loadout(e).right.name, loadout(e).left?.name].filter(Boolean).join('＋')}</span>
-      ${stainHere(run) ? `<p class="stain-note">ここにあなたの血痕がある（ソウル ${stainHere(run)!.souls}）。戦闘中、手番の初めに「ソウルを回収する」を選ぶと、その手番を使って取り戻せる。回収しないまま勝つか、もう一度倒れると失われる。</p>` : ''}
+      ${stainHere(run) ? `<p class="stain-note">ここにあなたの血痕がある（ソウル ${stainHere(run)!.souls}）。この部屋の敵に勝てば取り戻せる。戦闘中に手番の初めの「ソウルを回収する」で先に取り戻しておけば、この戦いで倒れても失わない（ここに落とし直す）。回収しないまま倒れると失われる。</p>` : ''}
       <button type="button" class="btn primary big" data-run="fight">戦う</button></div>`;
   } else if (room.kind === 'chest') {
     action = isLooted(run)
@@ -152,10 +157,10 @@ function renderRun(): void {
   } else {
     const rested = run.hp === null && run.fp === null;
     action = `<div class="room-card rk-bonfire"><p class="eyebrow">篝火</p><b>篝火が灯っている</b>
-      <span>休むとHPとFPが最大に戻ります。ここから退却すれば、拾ったものとソウルを持ち帰れます。</span>
+      <span>休むとHPとFPが最大に戻ります。ここから退却すると、ソウルと、主を倒した階層で拾ったものを持ち帰れます。</span>
       <div class="btns">
         <button type="button" class="btn ${rested ? '' : 'primary'}" data-run="rest" ${rested ? 'disabled' : ''}>${rested ? '休んだ' : '休む'}</button>
-        <button type="button" class="btn ${rested ? 'primary' : ''}" data-run="next">先へ進む（地下${run.floor + 2}層へ）</button>
+        <button type="button" class="btn ${rested ? 'primary' : ''}" data-run="next">${run.room === dungeon.floors[run.floor].length - 1 ? `先へ進む（地下${run.floor + 2}層へ）` : '先へ進む'}</button>
         <button type="button" class="btn" data-run="retreat">退却する（持ち帰る）</button>
       </div></div>`;
   }
@@ -181,6 +186,7 @@ function resultHTML({ run: r, banked }: { run: RunState; banked: Banked }): stri
         ${banked.items.map((id) => `<li>装備「${(WEAPONS[id] ?? SHIELDS[id] ?? ARMORS[id]).name}」を手に入れた</li>`).join('')}
         ${banked.cards.map((id) => `<li>カード「${CARDS[id].name}」を手に入れた</li>`).join('')}
         ${banked.dupes.map((id) => `<li>「${(WEAPONS[id] ?? SHIELDS[id] ?? ARMORS[id]).name}」はすでに持っていたのでソウルに替えた</li>`).join('')}
+        ${banked.left.map((l) => `<li class="dim">${lootName(l)}は、主を倒していない階層で拾ったので置いてきた</li>`).join('')}
       </ul>`;
   return `<div class="result-card ${r.status}"><h2>${title}</h2>${kept}
     <button type="button" class="btn primary big" data-run="done">戻る</button></div>`;
@@ -219,8 +225,8 @@ function fight(): void {
   startBattle(c, room.enemy!, (won, me) => {
     if (won) {
       const gotLoot = firstLoot ? `「${lootName(room.loot!)}」を拾った。` : '';
-      const lostStain = stainHere(r) ? `回収しなかった血痕のソウル ${stainHere(r)!.souls} は失われた。` : '';
-      step(winBattle(d, r, me.hp, me.fp), `${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}${lostStain}`);
+      const gotStain = stainHere(r) ? `血痕のソウル ${stainHere(r)!.souls} を取り戻した。` : '';
+      step(winBattle(d, r, me.hp, me.fp), `${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}${gotStain}`);
     } else {
       const prev = r.stain ? `前の血痕のソウル ${r.stain.souls} は失われた。` : '';
       const dropped = r.souls > 0 ? `ソウル ${r.souls} をこの部屋に落とした。` : '';
@@ -231,7 +237,7 @@ function fight(): void {
     surrenderNote: '地下墓で降参すると倒れたことになります。持っているソウルはこの部屋に落ち、最初の部屋からやり直しです。',
     special: stain ? {
       label: `ソウルを回収する（${stain.souls}）`,
-      note: 'この手番を使って、落としたソウルを取り戻す。ダイスは振らずに手番が終わる。',
+      note: 'この手番を使って先に取り戻す（ダイスは振らずに手番が終わる）。勝てば回収しなくても取り戻せるが、回収前に倒れると失う。',
       use: () => {
         r = retrieveStain(r);
         saveRun(r);
