@@ -70,6 +70,8 @@ interface ItemBase {
 /** 片手に持つ武器。触媒（杖・聖印・タリスマン）も武器として殴れる。 */
 export interface Weapon extends ItemBase {
   kind: 'weapon' | 'catalyst';
+  /** 淵結晶をはめられる数（底の武器） */
+  sockets?: number;
   /** 一段目のコスト [first]、以降は inc ずつ重くなる */
   first: number;
   inc: number;
@@ -108,6 +110,35 @@ export interface Armor {
   weight: number;
   /** 被ダメージのカット率（部位の合計を使う） */
   cut: Cut;
+}
+
+/** 淵結晶（底の武器にはめる）で強める・弱めるもの */
+export type CrystalKey = 'atk' | 'art' | 'spell' | 'bleed' | 'curse' | 'hp' | 'fp' | 'cut' | 'guard' | 'stMax';
+
+/** 淵結晶。値の割合（atk など）は 0.1 = 10% */
+export interface Crystal {
+  /** 一つずつ違う（同じ効果でも別物） */
+  uid: string;
+  name: string;
+  plus: { key: CrystalKey; value: number };
+  /** 呪われた淵結晶（深海）のマイナス効果。value は弱める量（正の数） */
+  minus?: { key: CrystalKey; value: number };
+}
+
+/** 装備・アクセサリ・淵結晶による戦闘中の補正 */
+export interface Mods {
+  guardDiscount: number;
+  healPct: number;
+  bleedPct: number;
+  /** 武器攻撃（通常攻撃と戦技）のダメージ割合増し */
+  atkPct: number;
+  /** 戦技のダメージ割合増し */
+  artPct: number;
+  /** 魔術・祈祷の威力の割合増し */
+  spellPct: number;
+  /** 武器が当たったときに足す出血・呪死 */
+  bleedAdd: number;
+  curseAdd: number;
 }
 
 /** アクセサリの効果 */
@@ -189,7 +220,7 @@ export interface Fighter {
   /** この戦闘で呪死してレベルを失った回数（戦闘後にキャラへ反映） */
   drained?: number;
   /** アクセサリによる戦闘中の効果 */
-  acc?: { guardDiscount: number; healPct: number; bleedPct: number };
+  acc?: Mods;
   buffs: Buffs;
 }
 

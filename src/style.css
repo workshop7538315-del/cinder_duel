@@ -305,3 +305,13 @@ button.die{padding:7px}
 /* ---- 周回 ---- */
 .cyc-pick{display:flex;flex-wrap:wrap;gap:6px}
 .cyc-pick .btn{padding:6px 12px}
+
+/* ---- 淵結晶 ---- */
+.sock-w{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px solid rgba(255,255,255,.06)}
+.sock-name{display:flex;gap:10px;align-items:baseline;margin:0}
+.sock-name span{font-size:12px}
+select.sock{width:100%}
+select.sock.cursed{border-color:#a8433b;color:#e8c4c1}
+.gains li.cursed{color:#e8c4c1}
+.deep-box{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding:12px;border:1px solid #2c4a5a;border-radius:8px;background:rgba(30,70,95,.18)}
+.deep-box .btn{align-self:flex-start}

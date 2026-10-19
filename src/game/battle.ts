@@ -74,6 +74,11 @@ export function cardUnusable(f: Fighter, id: string): string | null {
   return null;
 }
 
+/** 割合で強める（淵結晶など。0以上に収める） */
+const boosted = (dmg: number, pct = 0): number => Math.max(0, Math.round(dmg * (1 + pct)));
+/** 足す（どちらもなければ undefined のまま） */
+const addOn = (v: number | undefined, add = 0): number | undefined => (v || add ? (v ?? 0) + add : v);
+
 export class Battle {
   round = 0;
   phase: Phase = 'wait';
@@ -276,8 +281,8 @@ export class Battle {
     const w = f.right;
     f.chain++;
     await this.strike(f, o, {
-      label: `${w.name}・${f.chain}段目`, dmg: weaponDamage(f, w.dmg), type: w.type, weapon: true, bleed: weaponBleed(f, w.bleed),
-      curse: w.curse,
+      label: `${w.name}・${f.chain}段目`, dmg: boosted(weaponDamage(f, w.dmg), f.acc?.atkPct), type: w.type, weapon: true,
+      bleed: addOn(weaponBleed(f, w.bleed), f.acc?.bleedAdd), curse: addOn(w.curse, f.acc?.curseAdd),
     });
   }
 
@@ -288,8 +293,8 @@ export class Battle {
     f.fp -= a.fp;
     f.chain = 0;
     await this.strike(f, o, {
-      label: a.name, dmg: weaponDamage(f, a.dmg), type: a.type, weapon: true, unguardable: a.unguardable, bleed: weaponBleed(f, a.bleed),
-      curse: a.curse, drain: a.drain,
+      label: a.name, dmg: boosted(weaponDamage(f, a.dmg), (f.acc?.atkPct ?? 0) + (f.acc?.artPct ?? 0)), type: a.type, weapon: true,
+      unguardable: a.unguardable, bleed: addOn(weaponBleed(f, a.bleed), f.acc?.bleedAdd), curse: addOn(a.curse, f.acc?.curseAdd), drain: a.drain,
     });
   }
 

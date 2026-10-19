@@ -5,13 +5,15 @@ import { FIXED_CATACOMBS } from '../data/fixed';
 import { ABYSS_KEYS } from '../data/abyss';
 import { ACCESSORIES } from '../data/accessories';
 import { CATACOMBS } from '../data/catacombs';
+import { CRYSTAL_KINDS } from '../data/crystals';
+import type { Crystal, CrystalKey } from '../engine/types';
 import { RULES } from '../data/rules';
 import {
   classKit, inventoryOf, mergeInventory, newId, zeroStats, type Character, type Equip, type EquipSlot, type Inventory,
 } from './model';
 
 /** 保存形式のバージョン。形式を変えたら上げて、migrate に変換を足す。 */
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 export const STORAGE_KEY = 'cinder_duel.save';
 
 export interface SaveData {
@@ -28,6 +30,7 @@ function migrate(raw: { version?: unknown; characters?: unknown }): { characters
   // v1 → v2: 持ち物とソウルが増えた。持ち物がないキャラは sanitizeCharacter で
   //          「素性の初期装備・カード＋いま装備しているもの・デッキに入っているもの」を持っていることにする
   // v2 → v3: 作成時のレベル（freeLevels）を持つようになった。v2 までのキャラは作成時に30レベルもらっていた
+  // v4 → v5: 淵結晶（inventory.crystals）と、武器にはめた淵結晶（sockets）が増えた。どちらも空で始まる
   // v3 → v4: アクセサリ（accessories）と、地下墓ごとの踏破した周回（cycles）が増えた。どちらも空で始まる（sanitizeCharacter で補う）
   const list = Array.isArray(raw.characters) ? raw.characters : [];
   const characters = v < 3
@@ -90,6 +93,7 @@ export function sanitizeCharacter(raw: unknown): Character | null {
       ? [...new Set(r.accessories.filter((x): x is string => typeof x === 'string' && !!ACCESSORIES[x] && inventory.items.includes(x)))].slice(0, RULES.accessorySlots)
       : [],
     cycles: sanitizeCycles(r.cycles),
+    sockets: sanitizeSockets(r.sockets, inventory),
     abyssCleared: Array.isArray(r.abyssCleared) ? [...new Set(r.abyssCleared.filter((x): x is string => typeof x === 'string' && ABYSS_KEYS.includes(x)))] : [],
     createdAt: typeof r.createdAt === 'number' ? r.createdAt : now,
     updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : now,
@@ -97,6 +101,45 @@ export function sanitizeCharacter(raw: unknown): Character | null {
 }
 
 const isItem = (id: string) => !!(WEAPONS[id] || SHIELDS[id] || ARMORS[id] || ACCESSORIES[id]);
+
+const CRYSTAL_KEYS_SET = new Set(Object.keys(CRYSTAL_KINDS));
+
+function sanitizeCrystal(raw: unknown): Crystal | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const eff = (x: unknown) => {
+    if (!x || typeof x !== 'object') return null;
+    const e = x as Record<string, unknown>;
+    const v = Number(e.value);
+    return typeof e.key === 'string' && CRYSTAL_KEYS_SET.has(e.key) && Number.isFinite(v) && v > 0 && v < 100
+      ? { key: e.key as CrystalKey, value: Math.round(v * 100) / 100 } : null;
+  };
+  const plus = eff(r.plus);
+  if (typeof r.uid !== 'string' || !r.uid || !plus) return null;
+  const minus = r.minus === undefined ? undefined : eff(r.minus);
+  if (minus === null) return null;
+  const name = typeof r.name === 'string' && r.name ? r.name.slice(0, 30) : '淵結晶';
+  return minus ? { uid: r.uid.slice(0, 40), name, plus, minus } : { uid: r.uid.slice(0, 40), name, plus };
+}
+
+/** はめた淵結晶。持っている底の武器に、持っている淵結晶を、1つにつき1か所だけ */
+function sanitizeSockets(raw: unknown, inv: Inventory): Record<string, (string | null)[]> {
+  const out: Record<string, (string | null)[]> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  const have = new Set((inv.crystals ?? []).map((c) => c.uid));
+  const used = new Set<string>();
+  for (const [wid, slots] of Object.entries(raw as Record<string, unknown>)) {
+    const n = WEAPONS[wid]?.sockets ?? 0;
+    if (!n || !inv.items.includes(wid) || !Array.isArray(slots)) continue;
+    out[wid] = Array.from({ length: n }, (_, i) => {
+      const u = slots[i];
+      if (typeof u !== 'string' || !have.has(u) || used.has(u)) return null;
+      used.add(u);
+      return u;
+    });
+  }
+  return out;
+}
 
 function sanitizeCycles(raw: unknown): Record<string, number> {
   const out: Record<string, number> = {};
@@ -116,7 +159,10 @@ function sanitizeInventory(r: Record<string, unknown>): Inventory {
     const k = Math.floor(Number(n));
     if (CARDS[id] && Number.isFinite(k) && k > 0) cards[id] = Math.min(k, 99);
   }
-  return { items, cards };
+  const seen = new Set<string>();
+  const crystals = (Array.isArray(r.crystals) ? r.crystals : []).map(sanitizeCrystal)
+    .filter((c): c is Crystal => !!c && !seen.has(c.uid) && !!seen.add(c.uid)).slice(0, 500);
+  return { items, cards, crystals };
 }
 
 export function parseSave(text: string): SaveData {

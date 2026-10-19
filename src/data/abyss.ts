@@ -11,7 +11,7 @@ export interface AbyssDef {
   seed: string;
   blurb: string;
   hunter: EnemyDef;
-  /** 専用の物（杖・底の魔術・捨てると発動する道具） */
+  /** 専用の物（触媒の剣・底の魔術・捨てると発動する道具・2本目の武器） */
   loot: LootDef[];
 }
 
@@ -35,6 +35,7 @@ export const ABYSSES: Record<string, AbyssDef> = {
       { kind: 'item', id: 'deep_staff', tier: 3 },
       { kind: 'card', id: 'quake', tier: 3 },
       { kind: 'card', id: 'fossil', tier: 3 },
+      { kind: 'item', id: 'deep_hammer', tier: 3 },
     ],
   },
   hull: {
@@ -46,6 +47,7 @@ export const ABYSSES: Record<string, AbyssDef> = {
       { kind: 'item', id: 'hull_staff', tier: 3 },
       { kind: 'card', id: 'shipwreck', tier: 3 },
       { kind: 'card', id: 'barrel', tier: 3 },
+      { kind: 'item', id: 'hull_anchor', tier: 3 },
     ],
   },
   gorge: {
@@ -57,6 +59,7 @@ export const ABYSSES: Record<string, AbyssDef> = {
       { kind: 'item', id: 'gorge_staff', tier: 3 },
       { kind: 'card', id: 'gale', tier: 3 },
       { kind: 'card', id: 'feather', tier: 3 },
+      { kind: 'item', id: 'gorge_scythe', tier: 3 },
     ],
   },
   lake: {
@@ -68,6 +71,7 @@ export const ABYSSES: Record<string, AbyssDef> = {
       { kind: 'item', id: 'lake_staff', tier: 3 },
       { kind: 'card', id: 'tide', tier: 3 },
       { kind: 'card', id: 'droplet', tier: 3 },
+      { kind: 'item', id: 'lake_spear', tier: 3 },
     ],
   },
 };
@@ -91,7 +95,7 @@ export interface SeaDef {
   floors: SeaRoom[][];
 }
 
-const SEA_FOE = {
+export const SEA_FOE = {
   fishman: { name: '深海の魚人', classId: 'bandit', focus: { vit: 3, dex: 4, arc: 2, end: 1 }, equip: { right: 'fishman_claw', left: null, ...none } },
   crab: { name: '海底の大蟹', classId: 'hero', focus: { vit: 5, str: 4, end: 2 }, equip: { right: 'crab_pincer', left: null, ...none } },
   drowned: { name: '溺れ人の亡霊', classId: 'astrologer', focus: { vit: 3, int: 4, att: 3 }, equip: { right: 'drowned_grasp', left: null, ...none } },
@@ -125,6 +129,43 @@ export const SEAFLOOR: SeaDef = {
     ],
   ],
 };
+
+/**
+ * 深海。海底を踏破すると挑める。間取りはシードで決まる（ランダム生成）。
+ * 呪われた淵結晶（マイナスつき・プラスが大きい）が出る。強める対象はシードで決まり、
+ * 強さ・マイナスの対象・マイナスの大きさは潜るたびにばらつく。
+ */
+export const DEEP = {
+  name: '深海',
+  blurb: '海底のさらに下。光も音も届かない。呪われた淵結晶が眠る。',
+  enemies: [SEA_FOE.fishman, SEA_FOE.crab, SEA_FOE.drowned, BASILISK] as EnemyDef[],
+  floorBosses: [SEA_FOE.crab, SEA_FOE.drowned] as EnemyDef[],
+  boss: { ...SEA_FOE.serpent, name: '深海の大蛇' } as EnemyDef,
+  floorsMin: 2,
+  floorsMax: 3,
+  roomsMin: 3,
+  roomsMax: 5,
+  roomWeights: { battle: 6, chest: 2, bonfire: 1 },
+  /** 基準（自分のレベルとLv80の高いほう）への上乗せ。階層ごとに floorStep 上がる */
+  enemyBonus: 8,
+  floorBossBonus: 12,
+  bossBonus: 16,
+  floorStep: 2,
+  enemyHpRatio: 0.7,
+  floorBossHpRatio: 0.85,
+  bossHpRatio: 1,
+  enemySouls: 100,
+  floorBossSouls: 400,
+  bossSouls: 1200,
+  chestSouls: 300,
+  /** 道中の敵が呪われた淵結晶を落とす確率（主と宝箱は必ず） */
+  enemyCrystalChance: 0.3,
+  /** 深海の主が海淵の曲刀を落とす確率 */
+  falchionChance: 0.3,
+} as const;
+
+/** 深海のキー（catacombId は "abyss:deep"） */
+export const DEEP_KEY = 'deep';
 
 /** 海底のキー（catacombId は "abyss:sea"） */
 export const SEA_KEY = 'sea';

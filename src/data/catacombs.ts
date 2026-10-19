@@ -1,5 +1,5 @@
 import type { Equip } from '../character/model';
-import type { StatKey } from '../engine/types';
+import type { Crystal, StatKey } from '../engine/types';
 
 /** 地下墓に出る敵の型 */
 export interface EnemyDef {
@@ -11,9 +11,12 @@ export interface EnemyDef {
 
 /** 手に入るもの。tier が高いほど出にくく、長い地下墓ほど出やすい */
 export interface LootDef {
-  kind: 'item' | 'card';
+  kind: 'item' | 'card' | 'crystal';
+  /** 淵結晶は 'crystal' */
   id: string;
   tier: 1 | 2 | 3;
+  /** 淵結晶の中身（持ち帰ったときに uid がつく） */
+  crystal?: Crystal;
 }
 
 export interface CatacombDef {
