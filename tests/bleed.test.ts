@@ -38,9 +38,11 @@ describe('血盟騎士の装備と祈祷', () => {
     c.alloc.str = 0;
     c.equip.right = 'oath_saber';
     c.equip.left = 'oath_seal';
+    c.inventory.items.push('oath_saber', 'oath_seal');
+    c.inventory.cards = { ...c.inventory.cards, bloodclaw: 3, bloodoath: 2, bloodblade: 2 };
     const lo = loadout(c);
     expect(lo.rightOk && lo.leftOk).toBe(true);
-    c.deck = autoDeck(lo.stats, lo.schools, lo.right);
+    c.deck = autoDeck(lo.stats, lo.schools, lo.right, c.inventory.cards);
     expect(c.deck).toContain('bloodclaw');
     expect(checkCharacter(c).errors).toEqual([]);
   });

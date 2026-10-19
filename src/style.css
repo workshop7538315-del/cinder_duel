@@ -126,6 +126,47 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--ember);outline-
 .issues .wrn{color:#d9b98a}
 .save-bar{position:sticky;bottom:0;padding-block:10px calc(10px + env(safe-area-inset-bottom,0px));background:linear-gradient(transparent,var(--bg) 30%);display:flex;flex-direction:column;gap:4px}
 
+/* ---- 地下墓 ---- */
+#dgBody,#runBody{display:flex;flex-direction:column;gap:12px}
+.char-main .souls{color:var(--ember);font-variant-numeric:tabular-nums}
+.cat-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.cat{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:3px;text-align:left}
+.cat b{font-family:var(--display);font-size:15px}
+.cat span{font-size:11.5px;color:var(--muted);line-height:1.45}
+.cat.on{border-color:var(--ember);background:#2a2219}
+.seed-row{display:flex;flex-direction:column;gap:4px}
+.seed-row label{font-size:12px;color:var(--muted);letter-spacing:.08em}
+.seed-in{display:flex;gap:8px}
+.seed-in input{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.06em}
+.preview{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.pv-h{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.pv-q{color:var(--ember);letter-spacing:.1em}
+.floors{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.floors>li{display:grid;grid-template-columns:4.6em 1fr;align-items:center;gap:8px}
+.fl{font-size:11px;color:var(--muted)}
+.rooms{list-style:none;margin:0;padding:0;display:flex;gap:4px;flex-wrap:wrap}
+.rm{font-size:11px;line-height:22px;min-width:2.6em;text-align:center;border:1px solid var(--line);border-radius:3px;padding:0 4px;color:#cfcabe}
+.rm-boss{border-color:var(--blood);color:#e88a85}
+.rm-bonfire{border-color:var(--ember-dim);color:var(--ember)}
+.rm-chest{border-color:#4d5f3f;color:#b4cc9e}
+.rm.done{opacity:.35}
+.rm.here{background:var(--ember);color:var(--ink);border-color:var(--ember);font-weight:700}
+.run-h{display:flex;justify-content:space-between;align-items:flex-end;gap:8px;flex-wrap:wrap}
+.notice{margin:0;padding:8px 12px;border-left:3px solid var(--ember);background:#211d17;font-size:13px}
+.room-card{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:14px;display:flex;flex-direction:column;gap:6px}
+.room-card b{font-family:var(--display);font-size:20px}
+.room-card>span{font-size:12.5px;color:var(--muted)}
+.room-card.rk-boss{border-color:var(--blood)}
+.room-card.rk-bonfire{border-color:var(--ember-dim)}
+.room-card .btns{margin-top:4px}
+.result-card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.result-card h2{font-size:30px;letter-spacing:.12em}
+.result-card.cleared{border-color:var(--ember)}
+.result-card.dead h2{color:#e88a85}
+.gains{margin:0;padding-left:1.2em;display:flex;flex-direction:column;gap:4px}
+.gains b{color:var(--ember)}
+.dk-count output small{font-size:11px;color:var(--muted);font-family:var(--body)}
+
 /* ---- 対戦相手 ---- */
 #vsBody{display:flex;flex-direction:column;gap:12px}
 .vs-me,.own,.mode{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;text-align:left}

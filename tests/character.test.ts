@@ -62,6 +62,8 @@ describe('装備', () => {
   it('装備条件を満たさないと警告（保存はできる）', () => {
     const c = newCharacter('astrologer');
     c.equip.right = 'greatsword';
+    expect(checkCharacter(c).errors).toEqual(['「鉄塊の大剣」を持っていません。']);
+    c.inventory.items.push('greatsword');
     const r = checkCharacter(c);
     expect(r.errors).toEqual([]);
     expect(r.warnings.some((w) => w.includes('鉄塊の大剣'))).toBe(true);
@@ -104,5 +106,34 @@ describe('デッキ', () => {
     expect(errs.some((e) => e.includes(`${RULES.copyLimit}枚まで`))).toBe(true);
     c.deck = ['kick'];
     expect(checkCharacter(c).errors.some((e) => e.includes('デッキは'))).toBe(true);
+  });
+});
+
+import { classKit } from '../src/character/model';
+import { parseSave } from '../src/character/storage';
+
+describe('持ち物', () => {
+  it('作ったばかりのキャラは素性の装備とカードだけを持つ', () => {
+    for (const id of Object.keys(CLASSES)) {
+      const c = newCharacter(id);
+      const kit = classKit(id);
+      expect(c.inventory).toEqual(kit);
+      expect(c.deck.length).toBeGreaterThanOrEqual(RULES.deckMin);
+      expect(c.souls).toBe(0);
+    }
+  });
+  it('持っている枚数より多くデッキに入れられない', () => {
+    const c = newCharacter('vagabond');
+    c.inventory.cards.kick = 1;
+    c.deck = [...c.deck.filter((x) => x !== 'kick'), 'kick', 'kick'];
+    expect(checkCharacter(c).errors.some((e) => e.includes('1枚しか持っていません'))).toBe(true);
+  });
+  it('v1 のセーブは、装備中のものとデッキのカードを持っていることにして読み込む', () => {
+    const v1 = { version: 1, characters: [{ id: 'x', name: '旧', classId: 'astrologer', alloc: {}, equip: { right: 'star_staff', left: null }, deck: ['heavyarrow', 'heavyarrow'] }] };
+    const [c] = parseSave(JSON.stringify(v1)).characters;
+    expect(c.inventory.items).toContain('star_staff');
+    expect(c.inventory.items).toContain('novice_staff'); // 素性の初期装備
+    expect(c.inventory.cards.heavyarrow).toBe(2);
+    expect(c.souls).toBe(0);
   });
 });

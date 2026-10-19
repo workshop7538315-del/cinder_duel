@@ -67,7 +67,7 @@ function go(): void {
   if (mode === 'own') foe = ownPick ? findCharacter(ownPick) : null;
   else foe = pickPreset(charLevel(me), mode === 'strong');
   if (!foe) return;
-  startBattle(me, foe, () => openVersus(me.id, onBack));
+  startBattle(me, foe, () => openVersus(me.id, onBack), { surrenderNote: '練習試合なので、失うものはありません。' });
 }
 
 export function bindVersus(): void {

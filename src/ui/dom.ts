@@ -8,8 +8,8 @@ export const $ = <T extends HTMLElement = HTMLElement>(s: string): T => {
 export const esc = (s: string): string =>
   s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
-export type Screen = 'home' | 'editor' | 'versus' | 'battle';
-const SCREENS: Screen[] = ['home', 'editor', 'versus', 'battle'];
+export type Screen = 'home' | 'editor' | 'versus' | 'battle' | 'dungeon' | 'run';
+const SCREENS: Screen[] = ['home', 'editor', 'versus', 'battle', 'dungeon', 'run'];
 
 export function show(screen: Screen): void {
   for (const s of SCREENS) $(`#${s}`).hidden = s !== screen;

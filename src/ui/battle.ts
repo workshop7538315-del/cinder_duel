@@ -6,13 +6,15 @@ import { RULES } from '../data/rules';
 import { scaleLabel } from '../engine/scaling';
 import type { Die, Fighter } from '../engine/types';
 import { Battle, cardUnusable, type BattleIO, type IncomingHit, type LogKind, type Reaction } from '../game/battle';
-import { makeFighter } from '../game/setup';
+import { makeFighter, scaleHp } from '../game/setup';
 import { $, dieHTML, esc, show } from './dom';
 import { askCount, modal } from './modal';
 
 let B: Battle | null = null;
 let sel = new Set<number>();
-let onExit: () => void = () => {};
+/** 戦闘が終わったとき（勝敗と、終わったときの自分の状態） */
+export type BattleEnd = (won: boolean, me: Fighter) => void;
+let onExit: BattleEnd = () => {};
 
 /* ---------------- 表示 ---------------- */
 
@@ -214,19 +216,35 @@ const io: BattleIO = {
     setTimeout(async () => {
       await modal(`<div class="result"><p class="eyebrow">ラウンド ${b.round}</p><h3>${playerWon ? '勝利' : '敗北'}</h3></div>
         <p class="note">残りHP あなた ${b.p.hp}／${esc(b.e.name)} ${b.e.hp}</p>
-        <div class="btns"><button type="button" class="primary" data-v="r">戻る</button></div>`);
+        <div class="btns"><button type="button" class="primary" data-v="r">次へ</button></div>`);
       B = null;
-      onExit();
+      onExit(playerWon, b.p);
     }, 700);
   },
 };
 
 /* ---------------- 公開 ---------------- */
 
-export function startBattle(player: Character, foe: Character, exit: () => void): void {
+export interface BattleOptions {
+  /** 持ち越したHP・FP（地下墓の部屋をまたぐとき） */
+  hp?: number | null;
+  fp?: number | null;
+  /** 相手の最大HPの倍率 */
+  foeHpRatio?: number;
+  /** 降参したときの説明 */
+  surrenderNote?: string;
+}
+
+let surrenderNote = 'この戦いは負けになります。';
+
+export function startBattle(player: Character, foe: Character, exit: BattleEnd, opts: BattleOptions = {}): void {
   onExit = exit;
   sel = new Set();
-  B = new Battle(makeFighter(player, true), makeFighter(foe, false), io);
+  surrenderNote = opts.surrenderNote ?? 'この戦いは負けになります。';
+  const me = makeFighter(player, true);
+  if (opts.hp != null) me.hp = Math.min(me.maxHp, Math.max(1, opts.hp));
+  if (opts.fp != null) me.fp = Math.min(me.maxFp, Math.max(0, opts.fp));
+  B = new Battle(me, scaleHp(makeFighter(foe, false), opts.foeHpRatio), io);
   show('battle');
   $('#log').innerHTML = '';
   hint('');
@@ -261,11 +279,11 @@ export function bindBattle(): void {
       return;
     }
     if (t.closest('#surrender') && b.canAct()) {
-      const v = await modal(`<h3>降参する？</h3><p class="note">この戦いは負けになり、一覧に戻ります。</p>
+      const v = await modal(`<h3>降参する？</h3><p class="note">${surrenderNote}</p>
         <div class="btns"><button type="button" data-v="y">降参する</button><button type="button" class="primary" data-v="n">続ける</button></div>`);
       if (v === 'y' && b.surrender()) {
         B = null;
-        onExit();
+        onExit(false, b.p);
       }
     }
   });
