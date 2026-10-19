@@ -6,6 +6,7 @@ import { CARDS } from '../data/cards';
 import { CLASSES, STAT_NAMES, STAT_ORDER } from '../data/classes';
 import { ACCESSORIES, accessoryText } from '../data/accessories';
 import { crystalText } from '../data/crystals';
+import { dodgeBand } from '../engine/fighter';
 import { ARMORS, ARMOR_SLOTS, SHIELDS, WEAPONS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { costLabel, kg, pct, reqLabel, typeName } from '../engine/format';
@@ -164,11 +165,13 @@ function render(): void {
 
   const ratio = Math.min(lo.ratio, 1.2);
   const wc = lo.weightClass;
+  const band = dodgeBand(lo.level);
+  const dodgeNote = wc.dodge === null ? '' : `<p class="note dim">回避のコストは、受けるはずのダメージが大きいと増える（Lv${lo.level}：〜${band - 1}は[${wc.dodge}]、〜${band * 2 - 1}は[${wc.dodge + 1}]、〜${band * 3 - 1}は[${wc.dodge + 2}]、それ以上は[${wc.dodge + 3}]）。レベルが上がると幅も広がる。</p>`;
   const weightBox = `<div class="load">
     <div class="load-h"><span>装備重量 <b>${kg(lo.weight)}</b> / ${kg(lo.equipLoad)}（${pct(lo.ratio)}）</span><span class="wc wc-${wc.key}">${wc.name}</span></div>
     <div class="load-bar"><i style="width:${(ratio / 1.2) * 100}%"></i>
       <span style="left:${(RULES.loadLight / 1.2) * 100}%"></span><span style="left:${(RULES.loadMedium / 1.2) * 100}%"></span><span style="left:${(RULES.loadHeavy / 1.2) * 100}%"></span></div>
-    <p class="note">速度 ${wc.speedDice}d6・回避 ${wc.dodge === null ? '不可' : `[${wc.dodge}]`}・防具カット 物理${pct(lo.armorCut.phys)}／魔力${pct(lo.armorCut.magic)}／聖${pct(lo.armorCut.holy)}</p></div>`;
+    <p class="note">速度 ${wc.speedDice}d6・回避 ${wc.dodge === null ? '不可' : `[${wc.dodge}]`}・防具カット 物理${pct(lo.armorCut.phys)}／魔力${pct(lo.armorCut.magic)}／聖${pct(lo.armorCut.holy)}</p>${dodgeNote}</div>`;
 
   // デッキ
   const counts = countCards(c.deck);

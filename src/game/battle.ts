@@ -354,7 +354,7 @@ export class Battle {
     const cut = def.pattern ? Math.min(guardCut(def, atk.type), AUTO_BEHAVIOR.guardCutCap) : guardCut(def, atk.type);
     const hit: IncomingHit = {
       attacker: att, attack: atk, raw,
-      dodgeCost: dodgeCost(def),
+      dodgeCost: dodgeCost(def, raw),
       guardCost: guardCost(def, raw),
       guardCut: cut,
       guardDmg: Math.round(raw * (1 - cut)),
