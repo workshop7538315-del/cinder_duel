@@ -2,19 +2,18 @@ import { charLevel, checkCharacter, loadout, type Character } from '../character
 import { CARDS } from '../data/cards';
 import { CATACOMBS, type LootDef } from '../data/catacombs';
 import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
-import { generateDungeon, ROOM_NAMES, type Dungeon } from '../dungeon/generate';
+import { buildCatacomb, generateDungeon, normalizeSeed, ROOM_NAMES, type Dungeon } from '../dungeon/generate';
 import { randomSeed } from '../dungeon/rng';
 import {
   bankRun, currentRoom, leaveBonfire, loseBattle, openChest, rest, retreat, roomNumber, startRun, winBattle,
   type Banked, type RunState,
 } from '../dungeon/run';
-import { clearRun, loadRun, saveRun } from '../dungeon/save';
+import { clearRun, loadRun, loadSeedHistory, rememberSeed, saveRun } from '../dungeon/save';
 import { startBattle } from './battle';
 import { $, esc, show } from './dom';
 import { findCharacter, upsertCharacter } from './state';
 
 let charId: string | null = null;
-let catacombId = 'knight';
 let seed = randomSeed();
 let onBack: () => void = () => {};
 
@@ -28,7 +27,7 @@ let confirmAbandon = false;
 
 export const lootName = (l: LootDef): string =>
   l.kind === 'card' ? `カード「${CARDS[l.id].name}」` : (WEAPONS[l.id] ?? SHIELDS[l.id] ?? ARMORS[l.id]).name;
-const stars = (q: number) => '★'.repeat(1 + Math.round(q * 2)) + '☆'.repeat(2 - Math.round(q * 2));
+export const stars = (q: number) => '★'.repeat(1 + Math.round(q * 2)) + '☆'.repeat(2 - Math.round(q * 2));
 
 export const hasActiveRun = (id: string): boolean => !!loadRun(id);
 
@@ -39,6 +38,8 @@ export function openCatacombs(id: string, back: () => void): void {
   onBack = back;
   const saved = loadRun(id);
   if (saved) return resumeRun(saved);
+  // どの地下墓に入るかはシードで決まる。毎回ちがうシードを用意しておく
+  seed = randomSeed();
   show('dungeon');
   renderSelect();
 }
@@ -47,27 +48,27 @@ function renderSelect(): void {
   const c = charId ? findCharacter(charId) : undefined;
   if (!c) return onBack();
   const lv = charLevel(c);
-  const d = generateDungeon(catacombId, seed || 'x', lv);
   const bad = checkCharacter(c).errors.length > 0;
+  const history = loadSeedHistory();
+  const cur = normalizeSeed(seed);
   $('#dgBody').innerHTML = `
     <div class="vs-me"><p class="eyebrow">挑む者</p><b>${esc(c.name)}</b><span>Lv${lv}・ソウル ${c.souls}</span></div>
     <p class="note">手に入れたものとソウルは、主を倒すか、篝火から退却したときに持ち帰れます。途中で倒れると、その探索で得たものはすべて失います。</p>
-    <div class="cat-list">${Object.entries(CATACOMBS).map(([id, k]) => `
-      <button type="button" class="cat ${id === catacombId ? 'on' : ''}" data-cat="${id}" aria-pressed="${id === catacombId}">
-        <b>${k.name}</b><span>${k.blurb}</span></button>`).join('')}</div>
     <div class="seed-row">
       <label for="dgSeed">シード</label>
       <div class="seed-in"><input id="dgSeed" value="${esc(seed)}" maxlength="24" autocomplete="off" spellcheck="false">
         <button type="button" class="btn" data-seed="new">変える</button></div>
-      <p class="note">同じ地下墓・同じシードなら、同じ間取りと宝になります。敵の強さはあなたのレベルに合わせて変わります。</p>
+      <p class="note">どの地下墓に入るかは、シードで決まります。入るまでどこかはわかりません。同じシードを入れれば、同じ地下墓・同じ間取りと宝になります（敵の強さはあなたのレベルに合わせて変わります）。</p>
     </div>
-    <div class="preview">
-      <div class="pv-h"><span>${d.floors.length}階層・全${d.totalRooms}部屋</span><span class="pv-q" title="長いほど良いものが出やすい">報酬 ${stars(d.quality)}</span></div>
-      ${mapHTML(d, null)}
-    </div>
+    ${history.length ? `<div class="seed-hist"><p class="eyebrow">行ったことのあるシード</p>
+      ${history.map((h) => `<button type="button" class="hist ${h.seed === cur ? 'on' : ''}" data-hist="${esc(h.seed)}">
+        <b>${CATACOMBS[h.catacombId]?.name ?? '？'}</b><span>${h.rooms}部屋・報酬 ${stars(roomsQuality(h.rooms))}</span><code>${esc(h.seed)}</code></button>`).join('')}</div>` : ''}
     ${bad ? '<p class="warn">キャラクターに直すところがあります。編集してから挑んでください。</p>' : ''}
     <button type="button" class="btn primary big" id="dgGo" ${bad ? 'disabled' : ''}>入る</button>`;
 }
+
+/** 部屋数から報酬の目安（generate と同じ式） */
+const roomsQuality = (n: number) => Math.max(0, Math.min(1, (n - 3) / 12));
 
 function mapHTML(d: Dungeon, r: RunState | null): string {
   return `<ol class="floors">${d.floors.map((f, fi) => `
@@ -81,11 +82,12 @@ function mapHTML(d: Dungeon, r: RunState | null): string {
 function enter(): void {
   const c = charId ? findCharacter(charId) : undefined;
   if (!c || checkCharacter(c).errors.length) return;
-  const s = seed.trim() || randomSeed();
-  dungeon = generateDungeon(catacombId, s, charLevel(c));
+  const s = normalizeSeed(seed) || randomSeed();
+  dungeon = generateDungeon(s, charLevel(c));
   run = startRun(c.id, dungeon);
+  rememberSeed({ seed: s, catacombId: dungeon.catacombId, rooms: dungeon.totalRooms, at: Date.now() });
+  notice = `${CATACOMBS[dungeon.catacombId].name}に入った。${dungeon.floors.length}階層・全${dungeon.totalRooms}部屋。`;
   result = null;
-  notice = '';
   saveRun(run);
   show('run');
   renderRun();
@@ -93,8 +95,7 @@ function enter(): void {
 
 function resumeRun(saved: RunState): void {
   run = saved;
-  dungeon = generateDungeon(saved.catacombId, saved.seed, saved.level);
-  catacombId = saved.catacombId;
+  dungeon = buildCatacomb(saved.catacombId, saved.seed, saved.level);
   result = null;
   notice = '探索の途中から再開しました。';
   show('run');
@@ -222,9 +223,9 @@ function fight(): void {
 export function bindCatacombs(): void {
   $('#dgBody').addEventListener('click', (ev) => {
     const t = ev.target as HTMLElement;
-    const cat = t.closest<HTMLElement>('[data-cat]');
-    if (cat) {
-      catacombId = cat.dataset.cat!;
+    const h = t.closest<HTMLElement>('[data-hist]');
+    if (h) {
+      seed = h.dataset.hist!;
       return renderSelect();
     }
     if (t.closest('[data-seed]')) {
@@ -236,7 +237,7 @@ export function bindCatacombs(): void {
   $('#dgBody').addEventListener('change', (ev) => {
     const t = ev.target as HTMLInputElement;
     if (t.id === 'dgSeed') {
-      seed = t.value.trim().slice(0, 24);
+      seed = t.value.slice(0, 24);
       renderSelect();
     }
   });

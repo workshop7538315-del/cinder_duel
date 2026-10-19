@@ -1,5 +1,5 @@
 import { autoAlloc, autoDeck, inventoryOf, loadout, type Character } from '../character/model';
-import { CATACOMBS, DUNGEON, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
+import { CATACOMB_ORDER, CATACOMBS, DUNGEON, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
 import { pick, pickWeighted, randInt, seededRng, type SeededRng } from './rng';
 
 export type RoomKind = 'battle' | 'chest' | 'bonfire' | 'boss';
@@ -54,8 +54,22 @@ function rollLoot(r: SeededRng, cat: CatacombDef, quality: number, floor: number
 
 const enemySouls = (level: number) => DUNGEON.soulsBase + level * DUNGEON.soulsPerLevel;
 
-/** 地下墓を作る。同じ地下墓・シード・レベルなら必ず同じものになる */
-export function generateDungeon(catacombId: string, seed: string, level: number): Dungeon {
+/** シードの表記ゆれをなくす（前後の空白を除き、小文字にする） */
+export const normalizeSeed = (seed: string): string => seed.trim().toLowerCase().slice(0, 24);
+
+/** シードでどの地下墓かが決まる */
+export function catacombFromSeed(seed: string): string {
+  return pick(seededRng(`catacomb:${normalizeSeed(seed)}`), CATACOMB_ORDER);
+}
+
+/** シードから地下墓を作る。同じシード・レベルなら必ず同じ地下墓・同じ中身になる */
+export function generateDungeon(seed: string, level: number): Dungeon {
+  const s = normalizeSeed(seed);
+  return buildCatacomb(catacombFromSeed(s), s, level);
+}
+
+/** 地下墓を指定して作る（再開やテスト用） */
+export function buildCatacomb(catacombId: string, seed: string, level: number): Dungeon {
   const cat = CATACOMBS[catacombId];
   const r = seededRng(`${catacombId}:${seed}`);
   const floorCount = randInt(r, DUNGEON.floorsMin, DUNGEON.floorsMax);

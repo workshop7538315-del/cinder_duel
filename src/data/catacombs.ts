@@ -119,6 +119,10 @@ export const CATACOMBS: Record<string, CatacombDef> = {
   },
 };
 
+/** シードから地下墓を選ぶときの並び。新しい地下墓は末尾に足す
+ *  （数が変わると、同じシードで行ける地下墓も変わる） */
+export const CATACOMB_ORDER = ['knight', 'warrior', 'samurai', 'sorcerer', 'cleric', 'blood'];
+
 /** 地下墓の数値 */
 export const DUNGEON = {
   floorsMin: 1,

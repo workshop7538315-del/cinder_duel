@@ -3,7 +3,7 @@ import { checkCharacter, newCharacter } from '../src/character/model';
 import { CATACOMBS, DUNGEON } from '../src/data/catacombs';
 import { CARDS } from '../src/data/cards';
 import { ARMORS, SHIELDS, WEAPONS } from '../src/data/equipment';
-import { generateDungeon } from '../src/dungeon/generate';
+import { buildCatacomb, catacombFromSeed, generateDungeon } from '../src/dungeon/generate';
 import { seededRng } from '../src/dungeon/rng';
 import { bankRun, currentRoom, leaveBonfire, loseBattle, openChest, retreat, startRun, winBattle } from '../src/dungeon/run';
 
@@ -30,7 +30,7 @@ describe('地下墓の生成', () => {
   it('1〜3階層、各3〜5部屋。最後は主、途中の階層の最後は篝火', () => {
     for (const id of Object.keys(CATACOMBS)) {
       for (const s of seeds.slice(0, 40)) {
-        const d = generateDungeon(id, s, 30);
+        const d = buildCatacomb(id, s, 30);
         expect(d.floors.length).toBeGreaterThanOrEqual(DUNGEON.floorsMin);
         expect(d.floors.length).toBeLessThanOrEqual(DUNGEON.floorsMax);
         d.floors.forEach((f, fi) => {
@@ -43,14 +43,20 @@ describe('地下墓の生成', () => {
     }
   });
   it('同じ地下墓・シード・レベルなら同じ中身', () => {
-    expect(generateDungeon('blood', 'hello', 25)).toEqual(generateDungeon('blood', 'hello', 25));
-    expect(generateDungeon('blood', 'hello', 25)).not.toEqual(generateDungeon('blood', 'hellp', 25));
+    expect(generateDungeon('hello', 25)).toEqual(generateDungeon('hello', 25));
+    expect(generateDungeon(' HELLO ', 25)).toEqual(generateDungeon('hello', 25));
+    expect(generateDungeon('hello', 25)).not.toEqual(generateDungeon('hellp', 25));
+  });
+  it('シードでどの地下墓かが決まり、6種類すべてに行ける', () => {
+    expect(generateDungeon('abc', 30).catacombId).toBe(catacombFromSeed('abc'));
+    const seen = new Set(seeds.map(catacombFromSeed));
+    expect([...seen].sort()).toEqual(Object.keys(CATACOMBS).sort());
   });
   it('長い地下墓ほど良いものが出やすい', () => {
     const avg = (pred: (n: number) => boolean) => {
       const tiers: number[] = [];
       for (const s of seeds) {
-        const d = generateDungeon('knight', s, 30);
+        const d = buildCatacomb('knight', s, 30);
         if (!pred(d.totalRooms)) continue;
         for (const f of d.floors) for (const r of f) if (r.loot) tiers.push(r.loot.tier);
       }
@@ -59,13 +65,13 @@ describe('地下墓の生成', () => {
     expect(avg((n) => n >= 10)).toBeGreaterThan(avg((n) => n <= 5));
   });
   it('敵はちゃんと戦える状態', () => {
-    const d = generateDungeon('cleric', 'x', 20);
+    const d = buildCatacomb('cleric', 'x', 20);
     for (const f of d.floors) for (const r of f) if (r.enemy) expect(checkCharacter(r.enemy, { ignoreBudget: true }).errors).toEqual([]);
   });
 });
 
 describe('探索の進み方', () => {
-  const d = generateDungeon('samurai', 'walk', 30);
+  const d = buildCatacomb('samurai', 'walk', 30);
   const walk = () => {
     let run = startRun('c1', d);
     for (let guard = 0; guard < 50 && run.status === 'active'; guard++) {
