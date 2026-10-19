@@ -36,3 +36,33 @@ export function clearRun(charId: string): void {
     /* noop */
   }
 }
+
+/* ---------------- 行ったことのあるシード ---------------- */
+
+export interface SeedRecord {
+  seed: string;
+  catacombId: string;
+  rooms: number;
+  at: number;
+}
+
+const HISTORY_KEY = 'cinder_duel.seeds';
+const HISTORY_MAX = 12;
+
+export function loadSeedHistory(): SeedRecord[] {
+  try {
+    const r = JSON.parse(storage()?.getItem(HISTORY_KEY) ?? '[]') as SeedRecord[];
+    return Array.isArray(r) ? r.filter((x) => x && typeof x.seed === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export function rememberSeed(rec: SeedRecord): void {
+  try {
+    const list = [rec, ...loadSeedHistory().filter((x) => x.seed !== rec.seed)].slice(0, HISTORY_MAX);
+    storage()?.setItem(HISTORY_KEY, JSON.stringify(list));
+  } catch {
+    /* 覚えておけなくても遊べる */
+  }
+}
