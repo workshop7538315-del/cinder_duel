@@ -32,6 +32,8 @@ export interface Character {
   souls: number;
   /** 知っている困難な地下墓（FIXED_CATACOMBS のキー）。手がかりで覚える */
   clues?: string[];
+  /** 踏破した底（ABYSS_KEYS のどれか）。踏破した底には、入口から直接入れる */
+  abyssCleared?: string[];
   /** 失ったレベル（底から脱出したとき、呪死したとき）。この分だけ振れるレベルが減る */
   lostLevels?: number;
   /** ソウルで上げたレベル。この分だけ振れるレベルが増える */
@@ -184,7 +186,7 @@ export function newCharacter(classId: string, name?: string): Character {
   return {
     id: newId(), name: name ?? cls.name, classId,
     alloc: zeroStats(), equip: { ...cls.equip }, deck: deckFromCounts(inventory.cards),
-    inventory, souls: 0, clues: [], lostLevels: 0, boughtLevels: 0, createdAt: now, updatedAt: now,
+    inventory, souls: 0, clues: [], abyssCleared: [], lostLevels: 0, boughtLevels: 0, createdAt: now, updatedAt: now,
   };
 }
 

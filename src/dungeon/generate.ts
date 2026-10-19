@@ -1,6 +1,6 @@
 import { autoAlloc, autoDeck, inventoryOf, loadout, type Character } from '../character/model';
 import { CATACOMB_ORDER, CATACOMBS, DUNGEON, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
-import { ABYSS, ABYSSES, BASILISK } from '../data/abyss';
+import { ABYSS, ABYSS_KEYS, ABYSSES, BASILISK, SEA_KEY, SEAFLOOR } from '../data/abyss';
 import { FIXED, FIXED_CATACOMBS } from '../data/fixed';
 import { pick, pickWeighted, randInt, seededRng, type SeededRng } from './rng';
 
@@ -132,6 +132,7 @@ export const versionedSeed = (body: string): string => `${CURRENT_SEED_VERSION}-
 
 /** 底を作る。バジリスク2体（レベル+5）と盗掘者狩り（レベル+10）の1階層3部屋 */
 export function buildAbyss(key: string, seed: string, level: number): Dungeon {
+  if (key === SEA_KEY) return buildSea(seed, level);
   const a = ABYSSES[key];
   const r = seededRng(`abyss:${key}:${seed}`);
   const bl = Math.max(1, level + ABYSS.basiliskLevelBonus);
@@ -151,11 +152,41 @@ export function buildAbyss(key: string, seed: string, level: number): Dungeon {
   return { catacombId: `abyss:${key}`, name: a.name, rank: '底', seed, level, floors, totalRooms: 3, quality: 0 };
 }
 
-/** どの底に落ちるか */
+export { ABYSS_KEYS, SEA_KEY };
+
+/** 底の名前（海底も含む） */
+export const abyssName = (key: string): string | null => (key === SEA_KEY ? SEAFLOOR.name : ABYSSES[key]?.name ?? null);
+/** 底の直通のシード */
+export const abyssSeed = (key: string): string | null => (key === SEA_KEY ? SEAFLOOR.seed : ABYSSES[key]?.seed ?? null);
+
+/** 底の直通のシードなら、その底のキー */
+export function abyssFromSeed(seed: string): string | null {
+  const s = normalizeSeed(seed);
+  return ABYSS_KEYS.find((k) => abyssSeed(k) === s) ?? null;
+}
+
+/** どの底に落ちるか（まれに海底） */
 export const pickAbyss = (rand: () => number = Math.random): string => {
+  if (rand() < ABYSS.seaChance) return SEA_KEY;
   const keys = Object.keys(ABYSSES);
   return keys[Math.floor(rand() * keys.length)];
 };
+
+/** 海底を作る。間取りと宝は固定、敵のレベルだけ入ったときの自分のレベルに合わせる */
+export function buildSea(seed: string, level: number): Dungeon {
+  const floors: Room[][] = SEAFLOOR.floors.map((rooms, fi) => rooms.map((room, ri): Room => {
+    if (room.kind === 'battle' || room.kind === 'boss') {
+      return {
+        kind: room.kind, enemy: buildEnemy(room.enemy, Math.max(1, level + room.bonus), `abyss:sea:${fi}:${ri}`),
+        hpRatio: room.hpRatio, souls: room.souls, loot: room.loot ?? null,
+      };
+    }
+    if (room.kind === 'chest') return { kind: 'chest', souls: room.souls ?? 0, loot: room.loot ?? null };
+    return { kind: 'bonfire', souls: 0, loot: null };
+  }));
+  const totalRooms = floors.reduce((a, r) => a + r.length, 0);
+  return { catacombId: `abyss:${SEA_KEY}`, name: SEAFLOOR.name, rank: '底', seed, level, floors, totalRooms, quality: 1 };
+}
 
 /* ---------------- 困難な地下墓 ---------------- */
 

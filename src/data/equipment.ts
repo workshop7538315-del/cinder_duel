@@ -99,6 +99,37 @@ export const WEAPONS: Record<string, Weapon> = {
       dmg: { base: 5, scale: { arc: 0.2 } } },
   },
 
+  // ---- 海底の生き物（敵だけが使う） ----
+  fishman_claw: {
+    kind: 'weapon', name: '魚人の鉤爪', weight: 0, req: {}, natural: true, noEnchant: true,
+    first: 2, inc: 2, maxChain: 3, type: 'phys',
+    dmg: { base: 3, scale: { dex: 0.25 } }, cut: { phys: 0.15, magic: 0.1, holy: 0.1 },
+    bleed: { base: 2, scale: { arc: 0.05 } },
+    art: { name: '引き裂き', cost: { t: 'face', f: [1, 2] }, fp: 2, type: 'phys', dmg: { base: 6, scale: { dex: 0.25 } },
+      bleed: { base: 4, scale: { arc: 0.1 } } },
+  },
+  crab_pincer: {
+    kind: 'weapon', name: '大蟹の鋏', weight: 0, req: {}, natural: true, noEnchant: true,
+    first: 4, inc: 4, maxChain: 2, type: 'phys',
+    dmg: { base: 9, scale: { str: 0.45 } }, cut: { phys: 0.7, magic: 0.3, holy: 0.3 },
+    art: { name: '挟み潰し', cost: { t: 'set', f: [5, 6] }, fp: 3, type: 'phys', unguardable: true, dmg: { base: 14, scale: { str: 0.5 } } },
+  },
+  drowned_grasp: {
+    kind: 'weapon', name: '溺れ人の手', weight: 0, req: {}, natural: true, noEnchant: true,
+    first: 3, inc: 2, maxChain: 2, type: 'magic', curse: 3,
+    dmg: { base: 4, scale: { int: 0.2 } }, cut: { phys: 0.1, magic: 0.3, holy: 0.1 },
+    // 呪死でレベルを奪う（バジリスクと同じ）
+    art: { name: '水底へ引く', cost: { t: 'sum', n: 4 }, fp: 4, type: 'magic', curse: 6, drain: true, dmg: { base: 6, scale: { int: 0.25 } } },
+  },
+  serpent_fang: {
+    kind: 'weapon', name: '海淵の大蛇の牙', weight: 0, req: {}, natural: true, noEnchant: true,
+    first: 4, inc: 3, maxChain: 3, type: 'phys',
+    dmg: { base: 8, scale: { str: 0.35, arc: 0.15 } }, cut: { phys: 0.4, magic: 0.4, holy: 0.2 },
+    bleed: { base: 2, scale: { arc: 0.1 } },
+    art: { name: '大渦', cost: { t: 'sum', n: 6 }, fp: 6, type: 'magic', unguardable: true, curse: 5, drain: true,
+      dmg: { base: 16, scale: { arc: 0.4 } } },
+  },
+
   // ---- 触媒 ----
   novice_staff: {
     kind: 'catalyst', school: 'sorcery', name: '見習いの杖', weight: 2, req: { int: 10 },
@@ -153,6 +184,15 @@ export const WEAPONS: Record<string, Weapon> = {
     dmg: { base: 6, scale: { str: 0.2, int: 0.15, fai: 0.15 } }, cut: { phys: 0.5, magic: 0.4, holy: 0.3 },
     power: { base: 0, scale: { int: 0.45, fai: 0.2 } },
     art: { name: '水底斬り', cost: { t: 'sum', n: 4 }, fp: 3, type: 'magic', dmg: { base: 10, scale: { int: 0.3, fai: 0.2 } } },
+  },
+  // 海底の触媒武器。戦技で相手に呪死を溜める
+  sea_harpoon: {
+    kind: 'weapon', school: 'sorcery', name: '海底の銛', weight: 6, req: { str: 12, dex: 12, int: 16, arc: 12 },
+    first: 3, inc: 3, maxChain: 2, type: 'phys',
+    dmg: { base: 7, scale: { str: 0.2, dex: 0.2, int: 0.15 } }, cut: { phys: 0.45, magic: 0.4, holy: 0.25 },
+    power: { base: 0, scale: { int: 0.45, arc: 0.25 } },
+    art: { name: '深海突き', cost: { t: 'face', f: [3, 6] }, fp: 4, type: 'magic', curse: 4,
+      dmg: { base: 11, scale: { int: 0.3, arc: 0.2 } } },
   },
   old_talisman: {
     kind: 'catalyst', school: 'incant', name: '古びたタリスマン', weight: 0.5, req: { fai: 18 },

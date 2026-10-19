@@ -210,6 +210,28 @@ export const CARDS: Record<string, CardDef> = {
     run: () => {},
   },
 
+  // ---- 海底 ----
+  searoar: {
+    name: '海鳴り', kind: '魔術', role: 'attack', school: 'sorcery', cost: { t: 'sum', n: 5 }, fp: 5, req: { int: 18 },
+    discard: { min: 1, max: 3 },
+    text: (f) => `手札を1〜3枚捨てる。魔力${num(spell(f, 'sorcery', 4, 0.7), '4+杖×0.7')}＋捨てた枚数×4の攻撃。当たると呪死が捨てた枚数×3溜まる。`,
+    run: (b, f, o, ctx) =>
+      b.strike(f, o, { label: '海鳴り', dmg: (spell(f, 'sorcery', 4, 0.7) ?? 0) + ctx.discarded * 4, type: 'magic', curse: ctx.discarded * 3 }),
+  },
+  pearl: {
+    name: '海底の真珠', kind: 'アイテム', role: 'utility', cost: NO_COST, unplayable: true,
+    text: () => '使えない。捨てられると、FP5を回復し、カードを1枚引く。',
+    onDiscard: {
+      text: 'FP5回復・1枚引く',
+      run: (b, f) => {
+        f.fp = Math.min(f.maxFp, f.fp + 5);
+        const got = b.draw(f);
+        b.log(`FPが戻った。${got ? `「${CARDS[got].name}」を引いた。` : ''}`, b.side(f));
+      },
+    },
+    run: () => {},
+  },
+
   breath: {
     name: '深呼吸', kind: '技', role: 'utility', cost: { t: 'face', f: [6] },
     text: () => 'スタミナダイス+2（上限まで）。',

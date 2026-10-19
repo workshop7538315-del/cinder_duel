@@ -2,6 +2,7 @@ import { CARDS } from '../data/cards';
 import { CLASSES, STAT_ORDER } from '../data/classes';
 import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
 import { FIXED_CATACOMBS } from '../data/fixed';
+import { ABYSS_KEYS } from '../data/abyss';
 import { RULES } from '../data/rules';
 import {
   classKit, inventoryOf, mergeInventory, newId, zeroStats, type Character, type Equip, type EquipSlot, type Inventory,
@@ -72,6 +73,7 @@ export function sanitizeCharacter(raw: unknown): Character | null {
     lostLevels: lost,
     boughtLevels: bought,
     clues: Array.isArray(r.clues) ? [...new Set(r.clues.filter((x): x is string => typeof x === 'string' && !!FIXED_CATACOMBS[x]))] : [],
+    abyssCleared: Array.isArray(r.abyssCleared) ? [...new Set(r.abyssCleared.filter((x): x is string => typeof x === 'string' && ABYSS_KEYS.includes(x)))] : [],
     createdAt: typeof r.createdAt === 'number' ? r.createdAt : now,
     updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : now,
   };
