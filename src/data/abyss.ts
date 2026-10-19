@@ -134,6 +134,8 @@ export const ABYSS_KEYS: string[] = [...Object.keys(ABYSSES), SEA_KEY];
 export const ABYSS = {
   /** 底に落ちるとき、海底に落ちる確率 */
   seaChance: 0.1,
+  /** 底の敵のレベルの基準は、自分のレベルとこの値の高いほう（低いレベルでは歯が立たない） */
+  minBaseLevel: 80,
   /** 困難な地下墓のシードで入ったとき、入れる確率（入れなければ底に落ちる） */
   fixedEntryChance: 0.05,
   basiliskLevelBonus: 5,

@@ -135,8 +135,9 @@ export function buildAbyss(key: string, seed: string, level: number): Dungeon {
   if (key === SEA_KEY) return buildSea(seed, level);
   const a = ABYSSES[key];
   const r = seededRng(`abyss:${key}:${seed}`);
-  const bl = Math.max(1, level + ABYSS.basiliskLevelBonus);
-  const hl = Math.max(1, level + ABYSS.hunterLevelBonus);
+  const base = abyssBaseLevel(level);
+  const bl = base + ABYSS.basiliskLevelBonus;
+  const hl = base + ABYSS.hunterLevelBonus;
   const basilisk = (ri: number): Room => ({
     kind: 'battle', enemy: buildEnemy(BASILISK, bl, `abyss:${key}:${seed}:${ri}`), hpRatio: ABYSS.basiliskHpRatio,
     souls: ABYSS.basiliskSouls, loot: r() < ABYSS.basiliskDropChance ? pick(r, a.loot) : null,
@@ -165,6 +166,9 @@ export function abyssFromSeed(seed: string): string | null {
   return ABYSS_KEYS.find((k) => abyssSeed(k) === s) ?? null;
 }
 
+/** 底の敵のレベルの基準（自分のレベルと Lv80 の高いほう） */
+export const abyssBaseLevel = (level: number): number => Math.max(level, ABYSS.minBaseLevel);
+
 /** どの底に落ちるか（まれに海底） */
 export const pickAbyss = (rand: () => number = Math.random): string => {
   if (rand() < ABYSS.seaChance) return SEA_KEY;
@@ -177,7 +181,7 @@ export function buildSea(seed: string, level: number): Dungeon {
   const floors: Room[][] = SEAFLOOR.floors.map((rooms, fi) => rooms.map((room, ri): Room => {
     if (room.kind === 'battle' || room.kind === 'boss') {
       return {
-        kind: room.kind, enemy: buildEnemy(room.enemy, Math.max(1, level + room.bonus), `abyss:sea:${fi}:${ri}`),
+        kind: room.kind, enemy: buildEnemy(room.enemy, abyssBaseLevel(level) + room.bonus, `abyss:sea:${fi}:${ri}`),
         hpRatio: room.hpRatio, souls: room.souls, loot: room.loot ?? null,
       };
     }
