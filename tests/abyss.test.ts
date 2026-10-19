@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { allocTotal, charLevel, checkCharacter, levelBudget, loseLevels, newCharacter } from '../src/character/model';
-import { ABYSS, ABYSSES } from '../src/data/abyss';
+import { ABYSS, ABYSS_KEYS, ABYSSES, SEA_KEY, SEAFLOOR } from '../src/data/abyss';
+import { WEAPONS } from '../src/data/equipment';
+import { sanitizeCharacter } from '../src/character/storage';
 import { CARDS } from '../src/data/cards';
 import { RULES } from '../src/data/rules';
 import { addCurse } from '../src/engine/fighter';
-import { buildAbyss, rebuildDungeon } from '../src/dungeon/generate';
+import { abyssFromSeed, abyssSeed, buildAbyss, fixedFromSeed, pickAbyss, rebuildDungeon } from '../src/dungeon/generate';
 import { Battle, type BattleIO } from '../src/game/battle';
 import { makeFighter } from '../src/game/setup';
 
@@ -116,5 +118,55 @@ describe('捨てて使う魔術と、捨てられると発動する道具', () =
     const { cardUnusable } = await import('../src/game/battle');
     expect(cardUnusable(b.p, 'quake')).toMatch(/捨てる手札/);
     expect(cardUnusable(b.p, 'fossil')).toMatch(/捨てられたとき/);
+  });
+});
+
+describe('海底', () => {
+  it('間取りと宝は固定で、敵のレベルは入ったときのレベル＋固定値', () => {
+    const a = buildAbyss(SEA_KEY, 'a', 30);
+    const b = buildAbyss(SEA_KEY, 'b', 30);
+    expect(a.rank).toBe('底');
+    expect(a.catacombId).toBe('abyss:sea');
+    expect(a.floors.map((f) => f.map((r) => r.kind))).toEqual(b.floors.map((f) => f.map((r) => r.kind)));
+    expect(a.floors.flat().map((r) => r.loot?.id ?? null)).toEqual(b.floors.flat().map((r) => r.loot?.id ?? null));
+    a.floors.forEach((f, fi) => f.forEach((r, ri) => {
+      const def = SEAFLOOR.floors[fi][ri];
+      if (def.kind === 'battle' || def.kind === 'boss') expect(charLevel(r.enemy!)).toBe(30 + def.bonus);
+    }));
+    // 各階層の最後の戦闘は主、最後の主は専用の触媒武器を落とす
+    const last = a.floors[a.floors.length - 1];
+    expect(last[last.length - 1].kind).toBe('boss');
+    expect(last[last.length - 1].loot!.id).toBe('sea_harpoon');
+    expect(rebuildDungeon(a.catacombId, 'a', 30)).toEqual(a);
+  });
+  it('専用の物は3つ（触媒武器・捨てて使う魔術・捨てると発動する道具）', () => {
+    const [w, spell, item] = SEAFLOOR.loot;
+    expect(WEAPONS[w.id].school).toBe('sorcery');
+    expect(CARDS[spell.id].discard).toBeTruthy();
+    expect(CARDS[item.id].onDiscard).toBeTruthy();
+    // すべて海底のどこかで手に入る
+    const got = buildAbyss(SEA_KEY, 'x', 30).floors.flat().map((r) => r.loot?.id);
+    for (const l of SEAFLOOR.loot) expect(got).toContain(l.id);
+  });
+  it('底に落ちるとき、まれに海底になる', () => {
+    expect(pickAbyss(() => ABYSS.seaChance - 0.001)).toBe(SEA_KEY);
+    expect(Object.keys(ABYSSES)).toContain(pickAbyss(() => ABYSS.seaChance));
+  });
+});
+
+describe('踏破した底への直通', () => {
+  it('底ごとに直通のシードがあり、ほかのシードと重ならない', () => {
+    const seeds = ABYSS_KEYS.map((k) => abyssSeed(k));
+    expect(new Set(seeds).size).toBe(ABYSS_KEYS.length);
+    for (const k of ABYSS_KEYS) {
+      expect(abyssFromSeed(abyssSeed(k)!.toUpperCase())).toBe(k);
+      expect(fixedFromSeed(abyssSeed(k)!)).toBeNull();
+    }
+    expect(abyssFromSeed('1-abcdefgh')).toBeNull();
+  });
+  it('踏破した底は保存される（知らないキーは捨てる）', () => {
+    const c = { ...newCharacter('vagabond'), abyssCleared: ['earth', 'sea', 'nope'] };
+    const back = sanitizeCharacter(JSON.parse(JSON.stringify(c)))!;
+    expect(back.abyssCleared).toEqual(['earth', 'sea']);
   });
 });

@@ -5,7 +5,7 @@ import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
 import { ABYSS } from '../data/abyss';
 import { FIXED_CATACOMBS } from '../data/fixed';
 import {
-  buildAbyss, fixedFromSeed, generateDungeon, normalizeSeed, pickAbyss, rebuildDungeon, ROOM_NAMES, strayInto, versionedSeed,
+  abyssFromSeed, abyssName, abyssSeed, ABYSS_KEYS, buildAbyss, fixedFromSeed, SEA_KEY, generateDungeon, normalizeSeed, pickAbyss, rebuildDungeon, ROOM_NAMES, strayInto, versionedSeed,
   type Dungeon,
 } from '../dungeon/generate';
 import { randomSeed } from '../dungeon/rng';
@@ -73,13 +73,31 @@ function renderSelect(): void {
       ${history.map((h) => `<button type="button" class="hist ${h.seed === cur ? 'on' : ''}" data-hist="${esc(h.seed)}">
         <b>${dungeonName(h.catacombId)}</b><span>${h.catacombId.startsWith('fixed:') ? '困難・' : ''}${h.rooms}部屋・報酬 ${h.catacombId.startsWith('fixed:') ? '★★★' : stars(roomsQuality(h.rooms))}</span><code>${esc(h.seed)}</code></button>`).join('')}</div>` : ''}
     ${clueHTML(c)}
+    ${abyssHTML(c)}
     ${bad ? '<p class="warn">キャラクターに直すところがあります。編集してから挑んでください。</p>' : ''}
     <button type="button" class="btn primary big" id="dgGo" ${bad ? 'disabled' : ''}>入る</button>`;
 }
 
 /** 地下墓の名前（困難な地下墓も含む） */
 export const dungeonName = (id: string): string =>
-  id.startsWith('fixed:') ? FIXED_CATACOMBS[id.slice(6)]?.name ?? '？' : CATACOMBS[id]?.name ?? '？';
+  id.startsWith('fixed:') ? FIXED_CATACOMBS[id.slice(6)]?.name ?? '？'
+    : id.startsWith('abyss:') ? abyssName(id.slice(6)) ?? '？'
+    : CATACOMBS[id]?.name ?? '？';
+
+/** 踏破した底（シードで直接入れる） */
+function abyssHTML(c: Character): string {
+  const known = ABYSS_KEYS.filter((k) => (c.abyssCleared ?? []).includes(k));
+  if (!known.length) return '';
+  return `<div class="seed-hist"><p class="eyebrow">踏破した底</p>
+    ${known.map((k) => {
+      const sd = abyssSeed(k)!;
+      return `<button type="button" class="hist hard ${normalizeSeed(seed) === sd ? 'on' : ''}" data-hist="${esc(sd)}">
+        <b>${abyssName(k)}</b><span>高難度・${k === SEA_KEY ? '2階層9部屋' : '1階層3部屋'}・敵はあなたのレベルより上</span><code>${esc(sd)}</code></button>`;
+    }).join('')}</div>`;
+}
+
+/** 底の主（倒さずに出るとレベルを失う相手）の呼び名 */
+const abyssBoss = (key: string) => (key === SEA_KEY ? '海淵の大蛇' : '盗掘者狩り');
 
 /** 手がかりで知っている困難な地下墓 */
 function clueHTML(c: Character): string {
@@ -110,6 +128,21 @@ function enter(): void {
   const c = charId ? findCharacter(charId) : undefined;
   if (!c || checkCharacter(c).errors.length) return;
   let s = normalizeSeed(seed) || versionedSeed(randomSeed());
+  // 踏破した底は、そのシードで直接入れる
+  const direct = abyssFromSeed(s);
+  if (direct) {
+    if (!(c.abyssCleared ?? []).includes(direct)) {
+      $('#dgBody').insertAdjacentHTML('afterbegin', '<p class="warn">まだ踏破していない底には、シードでは入れません。</p>');
+      return;
+    }
+    dungeon = buildAbyss(direct, randomSeed(), charLevel(c));
+    run = startRun(c.id, dungeon);
+    notice = `${dungeon.name}へ降りた。${abyssBoss(direct)}を倒さずに脱出すると、レベルを${ABYSS.escapeLevelLoss}失う。`;
+    result = null;
+    saveRun(run);
+    show('run');
+    return renderRun();
+  }
   // 用意されたシードのまま入ると、まれに困難な地下墓に迷い込む
   const stray = seedAuto ? strayInto() : null;
   if (stray) s = stray;
@@ -125,7 +158,9 @@ function enter(): void {
     const key = pickAbyss();
     dungeon = buildAbyss(key, randomSeed(), charLevel(c));
     run = { ...startRun(c.id, dungeon), from: target };
-    notice = `「${FIXED_CATACOMBS[target].name}」への道を踏み外し、${dungeon.name}に落ちた。バジリスクの気配がする。盗掘者狩りを倒さずに脱出すると、レベルを${ABYSS.escapeLevelLoss}失う。`;
+    notice = key === SEA_KEY
+      ? `「${FIXED_CATACOMBS[target].name}」への道を踏み外し、底を突き抜けて${dungeon.name}まで沈んだ。光が届かない。${abyssBoss(key)}を倒さずに脱出すると、レベルを${ABYSS.escapeLevelLoss}失う。`
+      : `「${FIXED_CATACOMBS[target].name}」への道を踏み外し、${dungeon.name}に落ちた。バジリスクの気配がする。${abyssBoss(key)}を倒さずに脱出すると、レベルを${ABYSS.escapeLevelLoss}失う。`;
   } else {
     run = startRun(c.id, dungeon);
     rememberSeed({ seed: s, catacombId: dungeon.catacombId, rooms: dungeon.totalRooms, at: Date.now() });
@@ -188,7 +223,7 @@ function renderRun(): void {
     const finalBoss = room.kind === 'boss' && run.floor === dungeon.floors.length - 1;
     action = `<div class="room-card rk-${room.kind}"><p class="eyebrow">${room.kind === 'boss' ? (finalBoss ? 'この地下墓の主' : `地下${run.floor + 1}層の主`) : '敵'}</p>
       <b>${esc(e.name)}</b><span>Lv${charLevel(e)}・${[loadout(e).right.name, loadout(e).left?.name].filter(Boolean).join('＋')}</span>
-      ${e.equip.right === 'basilisk_maw' ? `<p class="stain-note">呪いの息は回避しないと呪死が溜まり、溜まりきると即死する。呪死するとレベルを1失い、底を出ても戻らない。ガードはできない。</p>` : ''}
+      ${dangerNote(e)}
       ${stainHere(run) ? `<p class="stain-note">ここにあなたの血痕がある（ソウル ${stainHere(run)!.souls}）。この部屋の敵に勝てば取り戻せる。戦闘中に手番の初めの「ソウルを回収する」で先に取り戻しておけば、この戦いで倒れても失わない（ここに落とし直す）。回収しないまま倒れると失われる。</p>` : ''}
       <button type="button" class="btn primary big" data-run="fight">戦う</button></div>`;
   } else if (room.kind === 'chest') {
@@ -220,6 +255,14 @@ function renderRun(): void {
     ${abandon}`;
 }
 
+/** 呪死でレベルを奪う敵の注意書き */
+function dangerNote(e: Character): string {
+  const w = loadout(e).right;
+  if (!w.art?.drain) return '';
+  const curse = w.curse ? '通常の攻撃でも呪死が溜まる。' : '';
+  return `<p class="stain-note">${w.art.name}は${w.art.unguardable ? 'ガードできず、' : ''}回避しないと呪死が溜まり、溜まりきると即死する。${curse}これで呪死するとレベルを1失い、底を出ても戻らない。</p>`;
+}
+
 function resultHTML({ run: r, banked }: { run: RunState; banked: Banked }): string {
   const abyss = r.catacombId.startsWith('abyss:');
   const title = r.status === 'cleared' ? '踏破' : r.status === 'retreated' ? '退却' : abyss ? '脱出' : '探索を諦めた';
@@ -242,6 +285,13 @@ function finish(next: RunState): void {
   clearRun(next.charId);
   if (!c) return onBack();
   const { character, banked } = bankRun(c, next);
+  if (next.status === 'cleared' && next.catacombId.startsWith('abyss:')) {
+    const key = next.catacombId.slice(6);
+    if (!(character.abyssCleared ?? []).includes(key)) {
+      character.abyssCleared = [...(character.abyssCleared ?? []), key];
+      notice = [notice, `${abyssName(key)}を踏破した。これからは入口の「踏破した底」から直接入れる（シード「${abyssSeed(key)}」）。`].filter(Boolean).join(' ');
+    }
+  }
   if (next.status === 'cleared' || next.status === 'retreated') upsertCharacter(character);
   if (next.status === 'abandoned' && next.catacombId.startsWith('abyss:')) {
     upsertCharacter(loseLevels(c, ABYSS.escapeLevelLoss));
