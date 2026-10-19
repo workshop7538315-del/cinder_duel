@@ -4,7 +4,7 @@ import { ARMORS, FISTS, SHIELDS, WEAPONS, WEIGHTS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { reqLabel } from '../engine/format';
 import { derive, levelCost, levelOf, meetsReq, unmetReq, weightKey } from '../engine/stats';
-import type { ArmorSlot, Cut, HandItem, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
+import type { ArmorSlot, Cut, HandItem, Requirements, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
 
 export type EquipSlot = 'right' | 'left' | ArmorSlot;
 export type Equip = Record<EquipSlot, string | null>;
@@ -34,6 +34,8 @@ export interface Character {
   clues?: string[];
   /** 踏破した底（ABYSS_KEYS のどれか）。踏破した底には、入口から直接入れる */
   abyssCleared?: string[];
+  /** 作成時にもらったレベル。新しいキャラは RULES.levelBudget（0）、v0.15 までのキャラは 30 */
+  freeLevels?: number;
   /** 失ったレベル（底から脱出したとき、呪死したとき）。この分だけ振れるレベルが減る */
   lostLevels?: number;
   /** ソウルで上げたレベル。この分だけ振れるレベルが増える */
@@ -186,13 +188,13 @@ export function newCharacter(classId: string, name?: string): Character {
   return {
     id: newId(), name: name ?? cls.name, classId,
     alloc: zeroStats(), equip: { ...cls.equip }, deck: deckFromCounts(inventory.cards),
-    inventory, souls: 0, clues: [], abyssCleared: [], lostLevels: 0, boughtLevels: 0, createdAt: now, updatedAt: now,
+    inventory, souls: 0, clues: [], abyssCleared: [], freeLevels: RULES.levelBudget, lostLevels: 0, boughtLevels: 0, createdAt: now, updatedAt: now,
   };
 }
 
-/** 振れるレベルの上限（作成時の30 ＋ ソウルで上げた分 − 失った分） */
-export const levelBudget = (c: Pick<Character, 'lostLevels' | 'boughtLevels'>): number =>
-  Math.max(0, RULES.levelBudget + (c.boughtLevels ?? 0) - (c.lostLevels ?? 0));
+/** 振れるレベルの上限（作成時にもらった分 ＋ ソウルで上げた分 − 失った分） */
+export const levelBudget = (c: Pick<Character, 'freeLevels' | 'lostLevels' | 'boughtLevels'>): number =>
+  Math.max(0, (c.freeLevels ?? RULES.legacyFreeLevels) + (c.boughtLevels ?? 0) - (c.lostLevels ?? 0));
 
 /** いちばん高い能力値（振った分があるもの）から n だけ下げる */
 function reduceAlloc(c: Character, n: number, allowNegative: boolean): Stats {
@@ -285,10 +287,18 @@ export function checkCharacter(c: Character, opts: CheckOptions = {}): Issues {
 }
 
 /** 決めた比率で能力値を振る（プリセットの敵を作るとき用） */
-export function autoAlloc(classId: string, level: number, focus: Partial<Record<StatKey, number>>): Stats {
+/** 能力値を自動で振る。need を渡すと、まずその値（装備条件など）に届くよう振る。
+ *  届かせるのにレベルが足りなければ、そのぶんレベルが上がる */
+export function autoAlloc(classId: string, level: number, focus: Partial<Record<StatKey, number>>, need: Requirements = {}): Stats {
   const base = CLASSES[classId].stats;
   const alloc = zeroStats();
   let points = Math.max(0, level - CLASSES[classId].level);
+  for (const [k, v] of Object.entries(need) as [StatKey, number][]) {
+    const d = Math.max(0, Math.min(v, RULES.statMax) - base[k]);
+    alloc[k] += d;
+    points -= d;
+  }
+  points = Math.max(0, points);
   const keys = STAT_ORDER.filter((k) => (focus[k] ?? 0) > 0);
   while (points > 0 && keys.length) {
     let best = keys[0];

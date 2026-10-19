@@ -163,9 +163,9 @@ function render(): void {
         <span class="lv">Lv <b>${lo.level}</b>　<span class="${left ? 'pts' : 'dim'}">残り ${left}</span></span></div>
       <div class="lvup"><span>ソウル <b>${c.souls}</b></span>
         <span>${left > 0 ? '振れるポイントが残っています' : `次のレベル <b>${levelCost(lo.level)}</b> ソウル`}</span></div>
-      ${left === 0 ? `<p class="note">ポイントを振り切ったあとは、ソウルを払って＋を押すとレベルが上がります。${D.bought.length ? `この編集で${D.bought.length}レベル上げました（保存するまで取り消せます）。` : ''}</p>` : ''}
-      ${c.lostLevels ? `<p class="note warn">底から脱出したため、レベルを${c.lostLevels}失っています（振れる上限が${c.lostLevels}減っています）。</p>` : ''}
-      ${!isNew ? '<p class="note">保存済みの振り分けは下げられません。残りのポイントはいつでも振れます。</p>' : ''}
+      ${left === 0 ? `<p class="note">ソウルを払って＋を押すと、レベルが上がります。ソウルは地下墓で集めます。${D.bought.length ? `この編集で${D.bought.length}レベル上げました（保存するまで取り消せます）。` : ''}</p>` : ''}
+      ${c.lostLevels ? `<p class="note warn">底からの脱出や呪死で、レベルを${c.lostLevels}失っています（振れる上限が${c.lostLevels}減っています）。</p>` : ''}
+      ${!isNew ? `<p class="note">保存済みの振り分けは下げられません。${left > 0 ? '残りのポイントはいつでも振れます。' : ''}</p>` : ''}
       <div class="st-list">${statRows}</div>
     </section>
     <section class="ed-sec">

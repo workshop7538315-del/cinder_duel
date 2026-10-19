@@ -36,11 +36,19 @@ describe('派生値の曲線', () => {
 });
 
 describe('レベルアップの振り分け', () => {
-  it(`${RULES.levelBudget}レベルを超えて振ると保存できない`, () => {
+  it('新しいキャラは素性のレベルから始まり、振れるレベルはない', () => {
     const c = newCharacter('vagabond');
-    c.alloc.vit = RULES.levelBudget;
+    expect(levelBudgetOf(c)).toBe(0);
+    expect(charLevel(c)).toBe(9);
     expect(checkCharacter(c).errors).toEqual([]);
-    expect(charLevel(c)).toBe(9 + RULES.levelBudget);
+    c.alloc.vit = 1;
+    expect(checkCharacter(c).errors.length).toBeGreaterThan(0);
+  });
+  it(`前の版のキャラは${RULES.legacyFreeLevels}レベルを持ち続け、それを超えて振ると保存できない`, () => {
+    const c = { ...newCharacter('vagabond'), freeLevels: RULES.legacyFreeLevels };
+    c.alloc.vit = RULES.legacyFreeLevels;
+    expect(checkCharacter(c).errors).toEqual([]);
+    expect(charLevel(c)).toBe(9 + RULES.legacyFreeLevels);
     c.alloc.str = 1;
     expect(checkCharacter(c).errors.length).toBeGreaterThan(0);
   });
@@ -138,7 +146,7 @@ describe('持ち物', () => {
   });
 });
 
-import { buyLevel, canBuyLevel, levelBudget as budgetOf, loseLevels } from '../src/character/model';
+import { buyLevel, canBuyLevel, levelBudget as budgetOf, levelBudget as levelBudgetOf, loseLevels } from '../src/character/model';
 import { levelCost } from '../src/engine/stats';
 
 describe('レベルアップ（ソウル）', () => {
@@ -148,24 +156,24 @@ describe('レベルアップ（ソウル）', () => {
     expect(levelCost(1)).toBe(RULES.levelCostMin);
   });
   it('ソウルを払うと、振れるレベルが1増える', () => {
-    const c = newCharacter('vagabond');
-    c.alloc.vit = RULES.levelBudget;
+    const c = { ...newCharacter('vagabond'), freeLevels: RULES.legacyFreeLevels };
+    c.alloc.vit = RULES.legacyFreeLevels;
     c.souls = levelCost(charLevel(c));
     expect(canBuyLevel(c)).toBe(true);
     const b = buyLevel(c);
     expect(b.souls).toBe(0);
-    expect(budgetOf(b)).toBe(RULES.levelBudget + 1);
+    expect(budgetOf(b)).toBe(RULES.legacyFreeLevels + 1);
     b.alloc.str += 1;
     expect(checkCharacter(b).errors).toEqual([]);
     expect(canBuyLevel(b)).toBe(false);
   });
   it('失ったレベルは、ソウルで上げ直せる', () => {
-    const c = newCharacter('vagabond');
-    c.alloc.vit = RULES.levelBudget;
+    const c = { ...newCharacter('vagabond'), freeLevels: RULES.legacyFreeLevels };
+    c.alloc.vit = RULES.legacyFreeLevels;
     const lost = loseLevels(c, 3);
-    expect(budgetOf(lost)).toBe(RULES.levelBudget - 3);
+    expect(budgetOf(lost)).toBe(RULES.legacyFreeLevels - 3);
     let x = { ...lost, souls: 1_000_000 };
     for (let i = 0; i < 3; i++) x = buyLevel(x);
-    expect(budgetOf(x)).toBe(RULES.levelBudget);
+    expect(budgetOf(x)).toBe(RULES.legacyFreeLevels);
   });
 });

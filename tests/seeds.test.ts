@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './fixtures/seeds-v1.json';
+import { charLevel } from '../src/character/model';
 import { FIXED_CATACOMBS } from '../src/data/fixed';
 import {
   buildFixed, catacombFromSeed, CURRENT_SEED_VERSION, fixedFromSeed, generateDungeon, rebuildDungeon, seedVersion,
@@ -36,17 +37,21 @@ describe('シードを守る（第1版）', () => {
 });
 
 describe('困難な地下墓', () => {
-  it('決まったシードでだけ入れ、中身は毎回同じ（レベルに関係なく固定）', () => {
+  it('決まったシードでだけ入れ、中身は毎回同じ（推奨レベルより下なら敵のレベルも固定）', () => {
     for (const [key, f] of Object.entries(FIXED_CATACOMBS)) {
       expect(fixedFromSeed(f.seed)).toBe(key);
       expect(fixedFromSeed(` ${f.seed.toUpperCase()} `)).toBe(key);
       const a = generateDungeon(f.seed, 10);
-      const b = generateDungeon(f.seed, 80);
+      const b = generateDungeon(f.seed, 40);
       expect(a.rank).toBe('困難');
       expect(a.name).toBe(f.name);
-      expect(a).toEqual(b);
+      expect(a.floors).toEqual(b.floors);
       expect(catacombFromSeed(f.seed)).toBe(`fixed:${key}`);
-      expect(rebuildDungeon(`fixed:${key}`, f.seed, 1)).toEqual(a);
+      expect(rebuildDungeon(`fixed:${key}`, f.seed, 10)).toEqual(a);
+      // 自分のほうが強ければ、敵は自分より上に引き上げられる（間取り・敵の種類・宝は同じ）
+      const hi = generateDungeon(f.seed, 120);
+      expect(hi.floors.map((fl) => fl.map((r) => [r.kind, r.loot]))).toEqual(a.floors.map((fl) => fl.map((r) => [r.kind, r.loot])));
+      for (const r of hi.floors.flat()) if (r.enemy) expect(charLevel(r.enemy)).toBeGreaterThan(120);
     }
   });
   it('各階層の最後は主で、途中の階層は主のあとに篝火', () => {

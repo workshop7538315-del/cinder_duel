@@ -9,7 +9,7 @@ import {
 } from './model';
 
 /** 保存形式のバージョン。形式を変えたら上げて、migrate に変換を足す。 */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const STORAGE_KEY = 'cinder_duel.save';
 
 export interface SaveData {
@@ -25,7 +25,12 @@ function migrate(raw: { version?: unknown; characters?: unknown }): { characters
   if (v > SAVE_VERSION) throw new Error('新しいバージョンのゲームで作られたデータです。ページを再読み込みしてください。');
   // v1 → v2: 持ち物とソウルが増えた。持ち物がないキャラは sanitizeCharacter で
   //          「素性の初期装備・カード＋いま装備しているもの・デッキに入っているもの」を持っていることにする
-  return { characters: Array.isArray(raw.characters) ? raw.characters : [] };
+  // v2 → v3: 作成時のレベル（freeLevels）を持つようになった。v2 までのキャラは作成時に30レベルもらっていた
+  const list = Array.isArray(raw.characters) ? raw.characters : [];
+  const characters = v < 3
+    ? list.map((c) => (c && typeof c === 'object' && !('freeLevels' in c) ? { ...c, freeLevels: RULES.legacyFreeLevels } : c))
+    : list;
+  return { characters };
 }
 
 const SLOTS: EquipSlot[] = ['right', 'left', 'head', 'chest', 'arms', 'legs'];
@@ -50,8 +55,12 @@ export function sanitizeCharacter(raw: unknown): Character | null {
   }
   const lost = Math.max(0, Math.floor(Number(r.lostLevels) || 0));
   const bought = Math.max(0, Math.floor(Number(r.boughtLevels) || 0));
+  // 書いていないのは古い形式のキャラ（アカウントに古い版で保存されたものなど）なので、作成時の30レベルを持たせる
+  const free = typeof r.freeLevels === 'number' && Number.isFinite(r.freeLevels)
+    ? Math.min(RULES.legacyFreeLevels, Math.max(0, Math.floor(r.freeLevels)))
+    : RULES.legacyFreeLevels;
   // 振れる上限を超えた不正なデータは振り直し扱いにする
-  if (STAT_ORDER.reduce((a, k) => a + alloc[k], 0) > Math.max(0, RULES.levelBudget + bought - lost)) for (const k of STAT_ORDER) alloc[k] = 0;
+  if (STAT_ORDER.reduce((a, k) => a + alloc[k], 0) > Math.max(0, free + bought - lost)) for (const k of STAT_ORDER) alloc[k] = 0;
   const re = (r.equip ?? {}) as Record<string, unknown>;
   const equip = {} as Equip;
   for (const s of SLOTS) equip[s] = validItem(s, re[s]);
@@ -70,6 +79,7 @@ export function sanitizeCharacter(raw: unknown): Character | null {
     deck,
     inventory,
     souls: Number.isFinite(souls) && souls > 0 ? Math.floor(souls) : 0,
+    freeLevels: free,
     lostLevels: lost,
     boughtLevels: bought,
     clues: Array.isArray(r.clues) ? [...new Set(r.clues.filter((x): x is string => typeof x === 'string' && !!FIXED_CATACOMBS[x]))] : [],

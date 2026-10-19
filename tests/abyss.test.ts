@@ -75,21 +75,21 @@ describe('呪死とレベル低下', () => {
 
 describe('底から脱出したときのレベル喪失', () => {
   it('振った能力値の高いものから3レベル減り、振れる上限も3減る', () => {
-    const c = newCharacter('vagabond');
-    c.alloc.str = RULES.levelBudget;
+    const c = { ...newCharacter('vagabond'), freeLevels: RULES.legacyFreeLevels };
+    c.alloc.str = RULES.legacyFreeLevels;
     const after = loseLevels(c, ABYSS.escapeLevelLoss);
     expect(after.lostLevels).toBe(3);
-    expect(levelBudget(after)).toBe(RULES.levelBudget - 3);
-    expect(allocTotal(after.alloc)).toBe(RULES.levelBudget - 3);
+    expect(levelBudget(after)).toBe(RULES.legacyFreeLevels - 3);
+    expect(allocTotal(after.alloc)).toBe(RULES.legacyFreeLevels - 3);
     expect(charLevel(after)).toBe(charLevel(c) - 3);
     expect(checkCharacter(after).errors).toEqual([]);
   });
   it('まだ振り切っていなければ、能力値は減らず上限だけ減る', () => {
-    const c = newCharacter('vagabond');
+    const c = { ...newCharacter('vagabond'), freeLevels: RULES.legacyFreeLevels };
     c.alloc.str = 5;
     const after = loseLevels(c, 3);
     expect(after.alloc.str).toBe(5);
-    expect(levelBudget(after)).toBe(RULES.levelBudget - 3);
+    expect(levelBudget(after)).toBe(RULES.legacyFreeLevels - 3);
   });
 });
 

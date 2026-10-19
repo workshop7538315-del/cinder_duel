@@ -1,6 +1,5 @@
 import { checkCharacter } from '../character/model';
 import { mergeSave, parseSave, serializeSave } from '../character/storage';
-import { RULES } from '../data/rules';
 import { hasActiveRun, openCatacombs } from './catacomb';
 import { $, esc, show } from './dom';
 import { openEditor } from './editor';
@@ -61,7 +60,7 @@ function render(): void {
             <button type="button" class="btn" data-edit="${c.id}">編集</button>${del}
           </div></article>`;
       }).join('')
-    : `<div class="empty-state"><p>まだキャラクターがいません。</p><p class="note">「新しく作る」から素性を選び、レベル${RULES.levelBudget}分の能力値を振って、装備とデッキを決めます。</p></div>`;
+    : `<div class="empty-state"><p>まだキャラクターがいません。</p><p class="note">「新しく作る」から素性を選び、装備とデッキを決めます。素性のレベルから始まり、地下墓で集めたソウルでレベルを上げます。</p></div>`;
   if (!storageOk()) dataMsg('このブラウザでは保存できませんでした。書き出しでファイルに残してください。');
 }
 

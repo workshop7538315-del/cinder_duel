@@ -13,7 +13,8 @@ export const CURVES = {
 
 export const RULES = {
   // キャラクリ
-  levelBudget: 30, //  作成時に上げられるレベル（これ以降はソウルで上げる）
+  levelBudget: 0, //  作成時に上げられるレベル（素性のレベルから始まり、あとはソウルで上げる）
+  legacyFreeLevels: 30, //  v0.15 までに作ったキャラが作成時にもらっていたレベル（そのキャラはそのまま持ち続ける）
   /** レベルアップに要るソウル = エルデンリングの式 × この倍率（最低 levelCostMin） */
   levelCostScale: 0.5,
   levelCostMin: 100,

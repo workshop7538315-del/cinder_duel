@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { checkCharacter, newCharacter } from '../src/character/model';
+import { charLevel, checkCharacter, newCharacter } from '../src/character/model';
 import { CATACOMBS, DUNGEON } from '../src/data/catacombs';
 import { CARDS } from '../src/data/cards';
 import { ARMORS, SHIELDS, WEAPONS } from '../src/data/equipment';
@@ -209,5 +209,21 @@ describe('退却で持ち帰れるもの', () => {
     }
     expect(run.bossDown).toEqual([0]);
     expect(loseBattle(run).bossDown).toEqual([0]);
+  });
+});
+
+describe('地下墓ごとの敵のレベル', () => {
+  it('煤けた地下墓は自分より低く、それ以外の地下墓は自分より高い', () => {
+    for (const id of Object.keys(CATACOMBS)) {
+      const d = buildCatacomb(id, 'lv', 40);
+      const first = d.floors[0][0];
+      const boss = d.floors[d.floors.length - 1].find((r) => r.kind === 'boss')!;
+      if (CATACOMBS[id].name.startsWith('煤けた')) {
+        expect(charLevel(first.enemy!), id).toBeLessThan(40);
+      } else {
+        expect(charLevel(first.enemy!), id).toBeGreaterThan(40);
+        expect(charLevel(boss.enemy!), id).toBeGreaterThan(40);
+      }
+    }
   });
 });

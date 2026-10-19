@@ -12,10 +12,20 @@ class MemStorage {
 
 describe('セーブデータ', () => {
   it('書き出したものを読み込むと同じキャラに戻る', () => {
-    const c = newCharacter('samurai', '刀の人');
+    const c = { ...newCharacter('samurai', '刀の人'), boughtLevels: 7 };
     c.alloc.dex = 7;
     const text = serializeSave({ version: SAVE_VERSION, characters: [c] });
     expect(parseSave(text).characters[0]).toEqual(c);
+  });
+  it('v2 のキャラは作成時の30レベルを持ったまま読み込まれる', () => {
+    const c = newCharacter('samurai');
+    const { freeLevels: _drop, ...old } = c;
+    old.alloc = { ...old.alloc, dex: 30 };
+    const back = parseSave(JSON.stringify({ version: 2, characters: [old] })).characters[0];
+    expect(back.freeLevels).toBe(30);
+    expect(back.alloc.dex).toBe(30);
+    // 新しい版で作ったキャラは0のまま
+    expect(parseSave(serializeSave({ version: SAVE_VERSION, characters: [c] })).characters[0].freeLevels).toBe(0);
   });
   it('ブラウザの保存領域に書いて読める', () => {
     const st = new MemStorage() as unknown as Storage;

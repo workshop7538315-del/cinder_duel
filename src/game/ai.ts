@@ -69,6 +69,9 @@ export function npcDiscards(hand: string[], min: number, max: number): number[] 
 /** リアクションで振る個数（0 = 受ける） */
 export function npcReactDice(def: Fighter, hit: IncomingHit): number {
   if (hit.raw <= 4) return 0;
+  // スタミナが少ないときは、命に関わる攻撃でなければ受けて、自分の手番のために残す
+  const dangerous = hit.raw >= def.hp || hit.raw >= def.maxHp * 0.2;
+  if (!dangerous && def.stamina <= 3) return 0;
   return Math.min(def.stamina, hit.raw >= 12 ? 3 : 2);
 }
 

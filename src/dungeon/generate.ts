@@ -2,6 +2,8 @@ import { autoAlloc, autoDeck, inventoryOf, loadout, type Character } from '../ch
 import { CATACOMB_ORDER, CATACOMBS, DUNGEON, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
 import { ABYSS, ABYSS_KEYS, ABYSSES, BASILISK, SEA_KEY, SEAFLOOR } from '../data/abyss';
 import { FIXED, FIXED_CATACOMBS } from '../data/fixed';
+import { SHIELDS, WEAPONS } from '../data/equipment';
+import type { Requirements } from '../engine/types';
 import { pick, pickWeighted, randInt, seededRng, type SeededRng } from './rng';
 
 export type RoomKind = 'battle' | 'chest' | 'bonfire' | 'boss';
@@ -37,10 +39,21 @@ export interface Dungeon {
 
 export const ROOM_NAMES: Record<RoomKind, string> = { battle: '敵', chest: '宝箱', bonfire: '篝火', boss: '主' };
 
+/** 敵が両手の装備を使いこなすのに要る能力値（低いレベルの敵でも装備条件を満たすようにする） */
+function equipNeeds(def: EnemyDef): Requirements {
+  const need: Requirements = {};
+  for (const id of [def.equip.right, def.equip.left]) {
+    const it = id ? WEAPONS[id] ?? SHIELDS[id] : null;
+    if (!it) continue;
+    for (const [k, v] of Object.entries(it.req) as [keyof Requirements, number][]) need[k] = Math.max(need[k] ?? 0, v);
+  }
+  return need;
+}
+
 function buildEnemy(def: EnemyDef, level: number, tag: string): Character {
   const c: Character = {
     id: `enemy:${tag}`, name: def.name, classId: def.classId,
-    alloc: autoAlloc(def.classId, level, def.focus), equip: { ...def.equip },
+    alloc: autoAlloc(def.classId, level, def.focus, equipNeeds(def)), equip: { ...def.equip },
     deck: [], inventory: { items: [], cards: {} }, souls: 0, createdAt: 0, updatedAt: 0,
   };
   const lo = loadout(c);
@@ -103,7 +116,7 @@ export const catacombFromSeed = (seed: string): string =>
 export function generateDungeon(seed: string, level: number): Dungeon {
   const s = normalizeSeed(seed);
   const fixed = fixedFromSeed(s);
-  if (fixed) return buildFixed(fixed);
+  if (fixed) return buildFixed(fixed, level);
   const gen = GENERATORS[seedVersion(s)];
   if (!gen) throw new Error('このシードは新しいバージョンのものです。ページを再読み込みしてください。');
   return gen(s, level);
@@ -111,7 +124,7 @@ export function generateDungeon(seed: string, level: number): Dungeon {
 
 /** 探索を再開するとき（入ったときの地下墓をそのまま作り直す） */
 export function rebuildDungeon(catacombId: string, seed: string, level: number): Dungeon {
-  if (catacombId.startsWith('fixed:')) return buildFixed(catacombId.slice(6));
+  if (catacombId.startsWith('fixed:')) return buildFixed(catacombId.slice(6), level);
   if (catacombId.startsWith('abyss:')) return buildAbyss(catacombId.slice(6), seed, level);
   const gen = GENERATORS[seedVersion(seed)] ?? GENERATORS[1];
   const d = gen(seed, level);
@@ -194,12 +207,14 @@ export function buildSea(seed: string, level: number): Dungeon {
 
 /* ---------------- 困難な地下墓 ---------------- */
 
-export function buildFixed(key: string): Dungeon {
+/** 困難な地下墓を作る。敵は書いたレベルが基本で、自分のほうが強ければ自分より上になるよう引き上げる */
+export function buildFixed(key: string, level = 0): Dungeon {
   const f = FIXED_CATACOMBS[key];
   const floors: Room[][] = f.floors.map((rooms, fi) => rooms.map((room, ri): Room => {
     if (room.kind === 'battle' || room.kind === 'boss') {
       return {
-        kind: room.kind, enemy: buildEnemy(room.enemy, room.level, `fixed:${key}:${fi}:${ri}`),
+        kind: room.kind,
+        enemy: buildEnemy(room.enemy, Math.max(room.level, level + (room.kind === 'boss' ? DUNGEON.fixedAboveBoss : DUNGEON.fixedAboveEnemy)), `fixed:${key}:${fi}:${ri}`),
         hpRatio: room.hpRatio ?? 1, souls: room.souls, loot: room.loot ?? null,
       };
     }
@@ -208,7 +223,7 @@ export function buildFixed(key: string): Dungeon {
   }));
   const totalRooms = floors.reduce((a, r) => a + r.length, 0);
   return {
-    catacombId: `fixed:${key}`, name: f.name, rank: f.rank, seed: f.seed, level: f.recommendedLevel,
+    catacombId: `fixed:${key}`, name: f.name, rank: f.rank, seed: f.seed, level,
     floors, totalRooms, quality: 1,
   };
 }
@@ -246,9 +261,10 @@ export function buildCatacomb(catacombId: string, seed: string, level: number): 
         // 最後の階層の主はその地下墓の主。途中の階層の主は、道中の敵の強い個体
         const base = boss && lastFloor ? cat.boss : pick(r, cat.enemies);
         const def = boss && !lastFloor ? { ...base, name: `${base.name}（地下${fi + 1}層の主）` } : base;
+        const off = cat.levelOffset ?? { enemy: DUNGEON.enemyLevelOffset, boss: DUNGEON.bossLevelOffset };
         const lv = Math.max(1, boss
-          ? level + DUNGEON.bossLevelOffset + fi * DUNGEON.enemyFloorStep
-          : level + DUNGEON.enemyLevelOffset + fi * DUNGEON.enemyFloorStep + ri * DUNGEON.enemyRoomStep);
+          ? level + off.boss + fi * DUNGEON.enemyFloorStep
+          : level + off.enemy + fi * DUNGEON.enemyFloorStep + ri * DUNGEON.enemyRoomStep);
         const drop = boss || r() < DUNGEON.dropChance ? rollLoot(r, cat, quality, fi, boss ? 2 : 1) : null;
         rooms.push({
           kind,
