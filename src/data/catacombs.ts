@@ -1,5 +1,6 @@
 import type { Equip } from '../character/model';
-import type { Crystal, StatKey } from '../engine/types';
+import type { Behavior, Crystal, StatKey } from '../engine/types';
+import { BEHAVIORS } from './behaviors';
 
 /** 地下墓に出る敵の型 */
 export interface EnemyDef {
@@ -7,6 +8,10 @@ export interface EnemyDef {
   classId: string;
   focus: Partial<Record<StatKey, number>>;
   equip: Equip;
+  /** 強敵（通常の敵より強い）。スタミナも手札もなく、パターンで動く */
+  elite?: boolean;
+  /** 強敵・主の動き方（なければ武器と装備から作る） */
+  behavior?: Behavior;
 }
 
 /** 手に入るもの。tier が高いほど出にくく、長い地下墓ほど出やすい */
@@ -48,7 +53,7 @@ export const CATACOMBS: Record<string, CatacombDef> = {
     name: '煤けた騎士の地下墓',
     blurb: '直剣と盾の騎士たち。騎士の鎧や大盾が眠る。',
     enemies: [
-      { name: '煤けた騎士', classId: 'vagabond', focus: { vit: 3, str: 2, dex: 2, end: 1 }, equip: { right: 'longsword', left: 'heater', ...knight } },
+      { name: '煤けた騎士', classId: 'vagabond', focus: { vit: 3, str: 2, dex: 2, end: 1 }, equip: { right: 'longsword', left: 'heater', ...knight }, elite: true, behavior: BEHAVIORS.knight },
       { name: '煤けた従士', classId: 'hero', focus: { vit: 3, str: 3, end: 1 }, equip: { right: 'battleaxe', left: 'buckler', ...travel, chest: 'knight_armor' } },
     ],
     boss: { name: '煤けた騎士長', classId: 'vagabond', focus: { vit: 3, str: 4, dex: 1, end: 2 }, equip: { right: 'halberd', left: 'heater', ...knight } },
@@ -121,7 +126,7 @@ export const CATACOMBS: Record<string, CatacombDef> = {
     levelOffset: { enemy: 2, boss: 5 },
     enemies: [
       { name: '血盟の従士', classId: 'bandit', focus: { vit: 3, dex: 2, arc: 3 }, equip: { right: 'oath_saber', left: 'buckler', ...travel } },
-      { name: '血盟騎士', classId: 'confessor', focus: { vit: 3, str: 2, arc: 3, end: 1 }, equip: { right: 'oath_cleaver', left: 'oath_seal', ...knight } },
+      { name: '血盟騎士', classId: 'confessor', focus: { vit: 3, str: 2, arc: 3, end: 1 }, equip: { right: 'oath_cleaver', left: 'oath_seal', ...knight }, elite: true, behavior: BEHAVIORS.oathKnight },
     ],
     boss: { name: '血盟騎士団長', classId: 'confessor', focus: { vit: 4, str: 2, arc: 4, end: 2 }, equip: { right: 'oath_cleaver', left: 'oath_seal', ...knight } },
     loot: [
@@ -150,6 +155,9 @@ export const DUNGEON = {
   enemyRoomStep: 1,
   /** 主のレベル = 自分のレベル + bossLevelOffset + 階層×floorStep */
   bossLevelOffset: -2,
+  /** 強敵（道中の部屋）の最大HPの倍率の下限と、ソウルの倍率 */
+  eliteHpRatio: 0.9,
+  eliteSoulsMult: 2,
   /** 2周目以降、1周ごとに上がる敵のレベル */
   cycleLevelStep: 12,
   /** 2周目以降、アクセサリを追加で落とす確率（地下墓の主・途中の階層の主・宝箱） */

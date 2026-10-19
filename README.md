@@ -24,6 +24,7 @@ npm run build    # dist/ に書き出し
 | `src/data/classes.ts` | 素性 |
 | `src/data/equipment.ts` | 重さの区分・武器・触媒・盾・防具 |
 | `src/data/accessories.ts` | アクセサリ（指輪・タリスマン）と、地下墓ごとに出るもの |
+| `src/data/behaviors.ts` | 強敵・主の動き方（行動パターン・回避とガードの確率） |
 | `src/data/crystals.ts` | 淵結晶（種類・値の幅・底ごとの出やすさ・呪われた淵結晶） |
 | `src/data/cards.ts` | カード |
 | `src/data/presets.ts` | 練習試合の相手（通常・強敵） |

@@ -1,6 +1,7 @@
 import { loadout, type Character } from '../character/model';
 import { shuffle } from '../engine/dice';
 import type { Fighter } from '../engine/types';
+import { firstMove } from './pattern';
 
 export function makeFighter(c: Character, isPlayer: boolean): Fighter {
   const lo = loadout(c);
@@ -33,6 +34,7 @@ export function makeFighter(c: Character, isPlayer: boolean): Fighter {
     bleed: 0,
     buffs: {},
     acc: lo.acc,
+    ...(c.behavior ? { pattern: { behavior: c.behavior, next: firstMove(c.behavior), rank: c.foeRank ?? '強敵' } } : {}),
   };
 }
 
