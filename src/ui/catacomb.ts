@@ -1,11 +1,11 @@
-import { allocTotal, charLevel, checkCharacter, levelBudget, levelUpAtBonfire, loadout, loseLevels, type Character } from '../character/model';
+import { allocTotal, itemName, charLevel, checkCharacter, levelBudget, levelUpAtBonfire, loadout, loseLevels, type Character } from '../character/model';
+import { ACCESSORIES } from '../data/accessories';
 import { STAT_NAMES, STAT_ORDER } from '../data/classes';
 import { RULES } from '../data/rules';
 import { levelCost } from '../engine/stats';
 import type { StatKey } from '../engine/types';
 import { CARDS } from '../data/cards';
-import { CATACOMBS, type LootDef } from '../data/catacombs';
-import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
+import { CATACOMBS, DUNGEON, type LootDef } from '../data/catacombs';
 import { ABYSS } from '../data/abyss';
 import { FIXED_CATACOMBS } from '../data/fixed';
 import {
@@ -27,6 +27,8 @@ let charId: string | null = null;
 let seed = versionedSeed(randomSeed());
 /** 用意されたシードのまま（手で変えていない）か。そのまま入ると、まれに困難な地下墓に迷い込む */
 let seedAuto = true;
+/** 挑みたい周回（その地下墓で行ける周回までに抑えられる） */
+let wantCycle = 1;
 let onBack: () => void = () => {};
 
 let dungeon: Dungeon | null = null;
@@ -40,7 +42,7 @@ let confirmAbandon = false;
 let lvPanel = false;
 
 export const lootName = (l: LootDef): string =>
-  l.kind === 'card' ? `カード「${CARDS[l.id].name}」` : (WEAPONS[l.id] ?? SHIELDS[l.id] ?? ARMORS[l.id]).name;
+  l.kind === 'card' ? `カード「${CARDS[l.id].name}」` : itemName(l.id);
 export const stars = (q: number) => '★'.repeat(1 + Math.round(q * 2)) + '☆'.repeat(2 - Math.round(q * 2));
 
 export const hasActiveRun = (id: string): boolean => !!loadRun(id);
@@ -78,6 +80,7 @@ function renderSelect(): void {
     ${history.length ? `<div class="seed-hist"><p class="eyebrow">行ったことのあるシード</p>
       ${history.map((h) => `<button type="button" class="hist ${h.seed === cur ? 'on' : ''}" data-hist="${esc(h.seed)}">
         <b>${dungeonName(h.catacombId)}</b><span>${h.catacombId.startsWith('fixed:') ? '困難・' : ''}${h.rooms}部屋・報酬 ${h.catacombId.startsWith('fixed:') ? '★★★' : stars(roomsQuality(h.rooms))}</span><code>${esc(h.seed)}</code></button>`).join('')}</div>` : ''}
+    ${cycleHTML(c)}
     ${clueHTML(c)}
     ${abyssHTML(c)}
     ${bad ? '<p class="warn">キャラクターに直すところがあります。編集してから挑んでください。</p>' : ''}
@@ -89,6 +92,19 @@ export const dungeonName = (id: string): string =>
   id.startsWith('fixed:') ? FIXED_CATACOMBS[id.slice(6)]?.name ?? '？'
     : id.startsWith('abyss:') ? abyssName(id.slice(6)) ?? '？'
     : CATACOMBS[id]?.name ?? '？';
+
+/** 周回を選ぶ欄（どこかの地下墓を踏破していれば出る） */
+function cycleHTML(c: Character): string {
+  const done = Object.entries(c.cycles ?? {}).filter(([k, n]) => CATACOMBS[k] && n > 0);
+  if (!done.length) return '';
+  const max = Math.max(...done.map(([, n]) => n)) + 1;
+  if (wantCycle > max) wantCycle = max;
+  return `<div class="seed-hist"><p class="eyebrow">周回</p>
+    <div class="cyc-pick">${Array.from({ length: max }, (_, i) => i + 1).map((n) =>
+      `<button type="button" class="btn ${n === wantCycle ? 'on primary' : ''}" data-cycle="${n}">${n}周目</button>`).join('')}</div>
+    <p class="note">踏破した地下墓は、次の周回に挑めます。周回ごとに敵のレベルが${DUNGEON.cycleLevelStep}上がり、2周目からは主や宝箱から指輪・タリスマンが出ます。入った地下墓でまだ行けない周回を選んでいたときは、行ける周回までになります。</p>
+    <p class="note dim">踏破: ${done.map(([k, n]) => `${CATACOMBS[k].name.replace('の地下墓', '')} ${n}周目`).join('・')}</p></div>`;
+}
 
 /** 踏破した底（シードで直接入れる） */
 function abyssHTML(c: Character): string {
@@ -168,10 +184,18 @@ function enter(): void {
       ? `「${FIXED_CATACOMBS[target].name}」への道を踏み外し、底を突き抜けて${dungeon.name}まで沈んだ。光が届かない。${abyssBoss(key)}を倒さずに脱出すると、レベルを${ABYSS.escapeLevelLoss}失う。`
       : `「${FIXED_CATACOMBS[target].name}」への道を踏み外し、${dungeon.name}に落ちた。バジリスクの気配がする。${abyssBoss(key)}を倒さずに脱出すると、レベルを${ABYSS.escapeLevelLoss}失う。`;
   } else {
+    // 踏破した地下墓は、選んだ周回で入り直す（行ける周回までに抑える）
+    let capped = '';
+    if (dungeon.rank === '通常' && wantCycle > 1) {
+      const allowed = (c.cycles?.[dungeon.catacombId] ?? 0) + 1;
+      const cyc = Math.min(wantCycle, allowed);
+      if (cyc < wantCycle) capped = `この地下墓はまだ${allowed}周目までしか挑めない。`;
+      if (cyc > 1) dungeon = generateDungeon(s, charLevel(c), cyc);
+    }
     run = startRun(c.id, dungeon);
     rememberSeed({ seed: s, catacombId: dungeon.catacombId, rooms: dungeon.totalRooms, at: Date.now() });
     if (dungeon.rank === '困難') learnClue(c, dungeon.catacombId.slice(6));
-    notice = `${stray ? '道に迷い、' : target ? '道を見失わずに、' : ''}${dungeon.name}に入った。${dungeon.rank === '困難' ? '【困難】' : ''}${dungeon.floors.length}階層・全${dungeon.totalRooms}部屋。`;
+    notice = `${capped}${stray ? '道に迷い、' : target ? '道を見失わずに、' : ''}${dungeon.name}${(dungeon.cycle ?? 1) > 1 ? `（${dungeon.cycle}周目）` : ''}に入った。${dungeon.rank === '困難' ? '【困難】' : ''}${dungeon.floors.length}階層・全${dungeon.totalRooms}部屋。`;
   }
   result = null;
   saveRun(run);
@@ -181,7 +205,7 @@ function enter(): void {
 
 function resumeRun(saved: RunState): void {
   run = saved;
-  dungeon = rebuildDungeon(saved.catacombId, saved.seed, saved.level);
+  dungeon = rebuildDungeon(saved.catacombId, saved.seed, saved.level, saved.cycle ?? 1);
   result = null;
   notice = '探索の途中から再開しました。';
   show('run');
@@ -203,7 +227,7 @@ function renderRun(): void {
   const hp = run.hp ?? maxHp;
   const fp = run.fp ?? maxFp;
 
-  const head = `<div class="run-h"><div><p class="eyebrow">シード ${esc(dungeon.seed)}</p><h1 class="page-h">${dungeon.name}${dungeon.rank !== '通常' ? ` <span class="rank">${dungeon.rank === '底' ? '高難度' : '困難'}</span>` : ''}</h1></div>
+  const head = `<div class="run-h"><div><p class="eyebrow">シード ${esc(dungeon.seed)}</p><h1 class="page-h">${dungeon.name}${dungeon.rank !== '通常' ? ` <span class="rank">${dungeon.rank === '底' ? '高難度' : '困難'}</span>` : ''}${(dungeon.cycle ?? 1) > 1 ? ` <span class="rank">${dungeon.cycle}周目</span>` : ''}</h1></div>
     <span class="lv">${Math.min(roomNumber(dungeon, run), dungeon.totalRooms)} / ${dungeon.totalRooms}部屋</span></div>`;
 
   if (result) {
@@ -344,9 +368,9 @@ function resultHTML({ run: r, banked }: { run: RunState; banked: Banked }): stri
     ? `<p class="note">この探索で得たソウルと拾ったものは、すべて失われました。${abyss ? `レベルを${ABYSS.escapeLevelLoss}失いました。` : ''}</p>`
     : `<ul class="gains">
         <li>ソウル <b>+${banked.souls}</b></li>
-        ${banked.items.map((id) => `<li>装備「${(WEAPONS[id] ?? SHIELDS[id] ?? ARMORS[id]).name}」を手に入れた</li>`).join('')}
+        ${banked.items.map((id) => `<li>${ACCESSORIES[id] ? ACCESSORIES[id].kind : '装備'}「${itemName(id)}」を手に入れた</li>`).join('')}
         ${banked.cards.map((id) => `<li>カード「${CARDS[id].name}」を手に入れた</li>`).join('')}
-        ${banked.dupes.map((id) => `<li>「${(WEAPONS[id] ?? SHIELDS[id] ?? ARMORS[id]).name}」はすでに持っていたのでソウルに替えた</li>`).join('')}
+        ${banked.dupes.map((id) => `<li>「${itemName(id)}」はすでに持っていたのでソウルに替えた</li>`).join('')}
         ${banked.left.map((l) => `<li class="dim">${lootName(l)}は、主を倒していない階層で拾ったので置いてきた</li>`).join('')}
       </ul>`;
   return `<div class="result-card ${r.status}"><h2>${title}</h2>${kept}
@@ -364,6 +388,14 @@ function finish(next: RunState): void {
     if (!(character.abyssCleared ?? []).includes(key)) {
       character.abyssCleared = [...(character.abyssCleared ?? []), key];
       notice = [notice, `${abyssName(key)}を踏破した。これからは入口の「踏破した底」から直接入れる（シード「${abyssSeed(key)}」）。`].filter(Boolean).join(' ');
+    }
+  }
+  if (next.status === 'cleared' && CATACOMBS[next.catacombId]) {
+    const cyc = next.cycle ?? 1;
+    const prev = character.cycles?.[next.catacombId] ?? 0;
+    if (cyc > prev) {
+      character.cycles = { ...(character.cycles ?? {}), [next.catacombId]: cyc };
+      notice = [notice, `${CATACOMBS[next.catacombId].name}の${cyc}周目を踏破した。次は${cyc + 1}周目に挑める（入口の「周回」で選ぶ）。`].filter(Boolean).join(' ');
     }
   }
   if (next.status === 'cleared' || next.status === 'retreated') upsertCharacter(character);
@@ -395,7 +427,7 @@ function fight(): void {
   const d = dungeon;
   let r = run;
   const stain = stainHere(r);
-  const firstLoot = room.loot && !isLooted(r);
+  const firstLoot = (room.loot || room.extra) && !isLooted(r);
   startBattle(c, room.enemy!, (won, me) => {
     // 呪死してレベルを失ったら、すぐにキャラへ反映する（脱出しても戻らない）
     let lost = '';
@@ -406,7 +438,7 @@ function fight(): void {
     }
     if (won) {
       if (room.clue) foundClue(room.clue);
-      const gotLoot = firstLoot ? `「${lootName(room.loot!)}」を拾った。` : '';
+      const gotLoot = firstLoot ? [room.loot, room.extra].filter((l): l is LootDef => !!l).map((l) => `「${lootName(l)}」を拾った。`).join('') : '';
       const gotStain = stainHere(r) ? `血痕のソウル ${stainHere(r)!.souls} を取り戻した。` : '';
       step(winBattle(d, r, me.hp, me.fp), `${lost}${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}${gotStain}`);
     } else {
@@ -455,6 +487,11 @@ export function bindCatacombs(): void {
       seedAuto = false;
       return renderSelect();
     }
+    const cy = t.closest<HTMLElement>('[data-cycle]');
+    if (cy) {
+      wantCycle = Number(cy.dataset.cycle) || 1;
+      return renderSelect();
+    }
     if (t.closest('[data-seed]')) {
       seed = versionedSeed(randomSeed());
       seedAuto = true;
@@ -484,7 +521,8 @@ export function bindCatacombs(): void {
       case 'open':
         if (room?.clue && !isLooted(run)) foundClue(room.clue);
         return step(openChest(dungeon, run),
-          isLooted(run) ? '' : room?.loot ? `宝箱から「${lootName(room.loot)}」を見つけた。` : `宝箱にはソウルが残っていた。ソウル +${room?.souls ?? 0}。`);
+          (isLooted(run) ? '' : room?.loot ? `宝箱から「${lootName(room.loot)}」を見つけた。` : `宝箱にはソウルが残っていた。ソウル +${room?.souls ?? 0}。`)
+          + (!isLooted(run) && room?.extra ? `奥に「${lootName(room.extra)}」もあった。` : ''));
       case 'proceed':
         return step(proceed(dungeon, run));
       case 'return': {

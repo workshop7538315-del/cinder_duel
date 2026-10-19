@@ -301,3 +301,7 @@ button.die{padding:7px}
 .bf-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px}
 .bf-stats .btn{justify-content:space-between;font-size:13px;padding:8px 10px}
 .bf-stats .btn b{margin-left:auto;margin-right:6px}
+
+/* ---- 周回 ---- */
+.cyc-pick{display:flex;flex-wrap:wrap;gap:6px}
+.cyc-pick .btn{padding:6px 12px}

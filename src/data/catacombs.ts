@@ -147,6 +147,12 @@ export const DUNGEON = {
   enemyRoomStep: 1,
   /** 主のレベル = 自分のレベル + bossLevelOffset + 階層×floorStep */
   bossLevelOffset: -2,
+  /** 2周目以降、1周ごとに上がる敵のレベル */
+  cycleLevelStep: 12,
+  /** 2周目以降、アクセサリを追加で落とす確率（地下墓の主・途中の階層の主・宝箱） */
+  cycleBossAccessory: 1,
+  cycleFloorBossAccessory: 0.5,
+  cycleChestAccessory: 0.25,
   /** 最初の部屋の亡者のレベル = 自分のレベル + hollowLevelOffset（第2版のシードから） */
   hollowLevelOffset: -10,
   /** 困難な地下墓は書いたレベルが基本だが、自分のほうが高ければ「自分のレベル＋この値」になる */

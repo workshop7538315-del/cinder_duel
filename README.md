@@ -23,6 +23,7 @@ npm run build    # dist/ に書き出し
 | `src/data/rules.ts` | 数値調整のつまみ（派生値の曲線、デッキ枚数、ガード消費の式など） |
 | `src/data/classes.ts` | 素性 |
 | `src/data/equipment.ts` | 重さの区分・武器・触媒・盾・防具 |
+| `src/data/accessories.ts` | アクセサリ（指輪・タリスマン）と、地下墓ごとに出るもの |
 | `src/data/cards.ts` | カード |
 | `src/data/presets.ts` | 練習試合の相手（通常・強敵） |
 | `src/data/catacombs.ts` | 地下墓（敵・主・手に入るもの）と地下墓の数値 |

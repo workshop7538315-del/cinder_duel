@@ -1,10 +1,11 @@
 import { AUTO_DECK_PRIORITY, CARDS } from '../data/cards';
 import { CLASSES, STAT_NAMES, STAT_ORDER } from '../data/classes';
+import { ACCESSORIES } from '../data/accessories';
 import { ARMORS, FISTS, SHIELDS, WEAPONS, WEIGHTS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { reqLabel } from '../engine/format';
 import { derive, levelCost, levelOf, meetsReq, unmetReq, weightKey } from '../engine/stats';
-import type { ArmorSlot, Cut, HandItem, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
+import type { Accessory, ArmorSlot, Cut, HandItem, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
 
 export type EquipSlot = 'right' | 'left' | ArmorSlot;
 export type Equip = Record<EquipSlot, string | null>;
@@ -30,6 +31,10 @@ export interface Character {
   inventory: Inventory;
   /** 持っているソウル */
   souls: number;
+  /** 身につけているアクセサリ（指輪・タリスマン）。4つまで */
+  accessories?: string[];
+  /** 地下墓ごとに、踏破した周回の最高（CATACOMBS のキー → 周回） */
+  cycles?: Record<string, number>;
   /** NPC（地下墓の敵・練習試合の相手）。装備条件を無視して装備を使いこなす（保存はしない） */
   npc?: boolean;
   /** 知っている困難な地下墓（FIXED_CATACOMBS のキー）。手がかりで覚える */
@@ -99,25 +104,51 @@ export interface Loadout {
   armorCut: Cut;
   schools: School[];
   derived: ReturnType<typeof derive>;
+  accessories: Accessory[];
+  /** アクセサリによる戦闘中の効果 */
+  acc: { guardDiscount: number; healPct: number; bleedPct: number };
 }
 
-export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip' | 'npc'>): Loadout {
-  const stats = charStats(c);
-  const derived = derive(stats);
+/** 身につけているアクセサリ（知らないIDと重複は除く） */
+export const accessoryItems = (ids: string[] | undefined): Accessory[] =>
+  [...new Set(ids ?? [])].slice(0, RULES.accessorySlots).map((id) => ACCESSORIES[id]).filter((a): a is Accessory => !!a);
+
+export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip' | 'npc' | 'accessories'>): Loadout {
+  const base = charStats(c);
+  const accs = accessoryItems(c.accessories);
+  // アクセサリの能力値は、装備条件と補正に効くがレベルには数えない
+  const stats = { ...base };
+  for (const a of accs) for (const [k, v] of Object.entries(a.effect.stats ?? {}) as [StatKey, number][]) stats[k] = Math.min(RULES.statMax, stats[k] + v);
+  const d0 = derive(stats);
+  const sum = (f: (a: Accessory) => number | undefined) => accs.reduce((n, a) => n + (f(a) ?? 0), 0);
+  const derived = {
+    ...d0,
+    maxHp: Math.floor(d0.maxHp * (1 + sum((a) => a.effect.hpPct))),
+    maxFp: d0.maxFp + sum((a) => a.effect.fp),
+    stInit: Math.min(d0.stMax, d0.stInit + sum((a) => a.effect.stInit)),
+  };
   const right = rightItem(c.equip);
   const left = leftItem(c.equip);
-  const weight = equipWeight(c.equip);
+  const weight = Math.round((equipWeight(c.equip) + sum((a) => a.weight)) * 10) / 10;
   const ratio = weight / derived.equipLoad;
   const schools = [right, left].flatMap((x) => (x && x.kind !== 'shield' && x.school ? [x.school] : []));
   return {
-    stats, level: levelOf(stats), right, left,
+    stats, level: levelOf(base), right, left,
     rightOk: !!c.npc || meetsReq(right.req, stats),
     leftOk: !left || !!c.npc || meetsReq(left.req, stats),
     weight, equipLoad: derived.equipLoad, ratio,
     weightClass: WEIGHTS[weightKey(ratio)],
-    armorCut: armorCut(c.equip),
+    armorCut: addCut(armorCut(c.equip), accs),
     schools, derived,
+    accessories: accs,
+    acc: { guardDiscount: sum((a) => a.effect.guardDiscount), healPct: sum((a) => a.effect.healPct), bleedPct: sum((a) => a.effect.bleedPct) },
   };
+}
+
+function addCut(cut: Cut, accs: Accessory[]): Cut {
+  const out = { ...cut };
+  for (const a of accs) for (const [k, v] of Object.entries(a.effect.cut ?? {}) as [keyof Cut, number][]) out[k] = Math.round((out[k] + v) * 100) / 100;
+  return out;
 }
 
 /* ---------------- デッキ ---------------- */
@@ -177,6 +208,9 @@ export function mergeInventory(a: Inventory, b: Inventory): Inventory {
   return { items: [...new Set([...a.items, ...b.items])], cards };
 }
 
+/** 装備・アクセサリの名前 */
+export const itemName = (id: string): string => (WEAPONS[id] ?? SHIELDS[id] ?? ARMORS[id] ?? ACCESSORIES[id])?.name ?? id;
+
 export const ownsItem = (c: Character, id: string): boolean => c.inventory.items.includes(id);
 export const ownedCards = (c: Character, id: string): number => c.inventory.cards[id] ?? 0;
 const deckFromCounts = (m: Record<string, number>): string[] => Object.entries(m).flatMap(([id, n]) => Array(n).fill(id));
@@ -190,7 +224,7 @@ export function newCharacter(classId: string, name?: string): Character {
   return {
     id: newId(), name: name ?? cls.name, classId,
     alloc: zeroStats(), equip: { ...cls.equip }, deck: deckFromCounts(inventory.cards),
-    inventory, souls: 0, clues: [], abyssCleared: [], freeLevels: RULES.levelBudget, lostLevels: 0, boughtLevels: 0, createdAt: now, updatedAt: now,
+    inventory, souls: 0, clues: [], abyssCleared: [], accessories: [], cycles: {}, freeLevels: RULES.levelBudget, lostLevels: 0, boughtLevels: 0, createdAt: now, updatedAt: now,
   };
 }
 
@@ -280,10 +314,17 @@ export function checkCharacter(c: Character, opts: CheckOptions = {}): Issues {
   const lo = loadout(c);
   if (c.equip.left && WEAPONS[c.equip.left]?.kind === 'weapon' && !WEAPONS[c.equip.left]?.school) errors.push('左手には盾か触媒（触媒を兼ねる武器を含む）しか持てません。');
   for (const id of equipIds(c.equip)) {
-    if (!ownsItem(c, id)) errors.push(`「${(WEAPONS[id] ?? SHIELDS[id] ?? ARMORS[id])?.name ?? id}」を持っていません。`);
+    if (!ownsItem(c, id)) errors.push(`「${itemName(id)}」を持っていません。`);
+  }
+  const accs = c.accessories ?? [];
+  if (accs.length > RULES.accessorySlots) errors.push(`アクセサリは${RULES.accessorySlots}つまでです。`);
+  if (new Set(accs).size !== accs.length) errors.push('同じアクセサリは1つしか身につけられません。');
+  for (const id of accs) {
+    if (!ACCESSORIES[id]) errors.push('不明なアクセサリを身につけています。');
+    else if (!ownsItem(c, id)) errors.push(`「${ACCESSORIES[id].name}」を持っていません。`);
   }
   const miss = (item: { name: string; req: Partial<Record<string, number>> }) =>
-    unmetReq(item.req, stats).map(([k, v]) => `${STAT_NAMES[k as StatKey]}${v}`).join('・');
+    unmetReq(item.req, lo.stats).map(([k, v]) => `${STAT_NAMES[k as StatKey]}${v}`).join('・');
   if (!lo.rightOk) warnings.push(`${lo.right.name}は能力不足（${miss(lo.right)}が必要）。攻撃力が下がり、補正も効きません。`);
   if (lo.left && !lo.leftOk) warnings.push(`${lo.left.name}は能力不足（${miss(lo.left)}が必要）。性能が下がります。`);
   if (lo.weightClass.key === 'over') warnings.push('装備重量が上限を超えています。回避ができません。');
@@ -298,7 +339,7 @@ export function checkCharacter(c: Character, opts: CheckOptions = {}): Issues {
     }
     if (k > RULES.copyLimit) errors.push(`「${card.name}」は${RULES.copyLimit}枚までです。`);
     else if (k > ownedCards(c, id)) errors.push(`「${card.name}」は${ownedCards(c, id)}枚しか持っていません。`);
-    const why = cardBlock(id, stats, lo.schools, lo.right);
+    const why = cardBlock(id, lo.stats, lo.schools, lo.right);
     if (why) errors.push(why.endsWith('が必要') ? `「${card.name}」を使うには${why}です。` : `「${card.name}」は使えません（${why}）。`);
   }
   return { errors, warnings };

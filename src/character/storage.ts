@@ -3,13 +3,15 @@ import { CLASSES, STAT_ORDER } from '../data/classes';
 import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
 import { FIXED_CATACOMBS } from '../data/fixed';
 import { ABYSS_KEYS } from '../data/abyss';
+import { ACCESSORIES } from '../data/accessories';
+import { CATACOMBS } from '../data/catacombs';
 import { RULES } from '../data/rules';
 import {
   classKit, inventoryOf, mergeInventory, newId, zeroStats, type Character, type Equip, type EquipSlot, type Inventory,
 } from './model';
 
 /** 保存形式のバージョン。形式を変えたら上げて、migrate に変換を足す。 */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 export const STORAGE_KEY = 'cinder_duel.save';
 
 export interface SaveData {
@@ -26,6 +28,7 @@ function migrate(raw: { version?: unknown; characters?: unknown }): { characters
   // v1 → v2: 持ち物とソウルが増えた。持ち物がないキャラは sanitizeCharacter で
   //          「素性の初期装備・カード＋いま装備しているもの・デッキに入っているもの」を持っていることにする
   // v2 → v3: 作成時のレベル（freeLevels）を持つようになった。v2 までのキャラは作成時に30レベルもらっていた
+  // v3 → v4: アクセサリ（accessories）と、地下墓ごとの踏破した周回（cycles）が増えた。どちらも空で始まる（sanitizeCharacter で補う）
   const list = Array.isArray(raw.characters) ? raw.characters : [];
   const characters = v < 3
     ? list.map((c) => (c && typeof c === 'object' && !('freeLevels' in c) ? { ...c, freeLevels: RULES.legacyFreeLevels } : c))
@@ -83,13 +86,27 @@ export function sanitizeCharacter(raw: unknown): Character | null {
     lostLevels: lost,
     boughtLevels: bought,
     clues: Array.isArray(r.clues) ? [...new Set(r.clues.filter((x): x is string => typeof x === 'string' && !!FIXED_CATACOMBS[x]))] : [],
+    accessories: Array.isArray(r.accessories)
+      ? [...new Set(r.accessories.filter((x): x is string => typeof x === 'string' && !!ACCESSORIES[x] && inventory.items.includes(x)))].slice(0, RULES.accessorySlots)
+      : [],
+    cycles: sanitizeCycles(r.cycles),
     abyssCleared: Array.isArray(r.abyssCleared) ? [...new Set(r.abyssCleared.filter((x): x is string => typeof x === 'string' && ABYSS_KEYS.includes(x)))] : [],
     createdAt: typeof r.createdAt === 'number' ? r.createdAt : now,
     updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : now,
   };
 }
 
-const isItem = (id: string) => !!(WEAPONS[id] || SHIELDS[id] || ARMORS[id]);
+const isItem = (id: string) => !!(WEAPONS[id] || SHIELDS[id] || ARMORS[id] || ACCESSORIES[id]);
+
+function sanitizeCycles(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    const n = Math.floor(Number(v));
+    if (CATACOMBS[k] && Number.isFinite(n) && n > 0) out[k] = Math.min(n, 99);
+  }
+  return out;
+}
 
 function sanitizeInventory(r: Record<string, unknown>): Inventory {
   const items = Array.isArray(r.items) ? [...new Set(r.items.filter((x): x is string => typeof x === 'string' && isItem(x)))] : [];

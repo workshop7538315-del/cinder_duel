@@ -391,6 +391,7 @@ export class Battle {
   /** 当たった攻撃の出血を溜め、弾けたらダメージ */
   private applyBleed(att: Fighter, def: Fighter, atk: Attack, guarded: boolean): void {
     let amount = (atk.bleed ?? 0) + (atk.weapon ? enchantBleed(att) : 0);
+    amount = Math.floor(amount * (1 + (att.acc?.bleedPct ?? 0)));
     if (guarded) amount = Math.floor(amount * RULES.bleedGuardRatio);
     if (amount <= 0 || def.hp <= 0) return;
     const burst = addBleed(def, amount);
@@ -429,6 +430,7 @@ export class Battle {
 
   heal(f: Fighter, n: number): void {
     const before = f.hp;
+    n = Math.floor(n * (1 + (f.acc?.healPct ?? 0)));
     f.hp = Math.min(f.maxHp, f.hp + n);
     this.log(`${this.who(f)}はHPを${f.hp - before}回復した。`, this.side(f));
   }

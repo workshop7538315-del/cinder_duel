@@ -110,6 +110,34 @@ export interface Armor {
   cut: Cut;
 }
 
+/** アクセサリの効果 */
+export interface AccessoryEffect {
+  /** 能力値の上乗せ（装備条件と補正に効く。レベルには数えない） */
+  stats?: Partial<Record<StatKey, number>>;
+  /** 最大HPの割合増し */
+  hpPct?: number;
+  /** 最大FPの加算 */
+  fp?: number;
+  /** 初期スタミナダイスの加算 */
+  stInit?: number;
+  /** カット率の加算（防具に足す） */
+  cut?: Partial<Cut>;
+  /** ガード消費を軽くする */
+  guardDiscount?: number;
+  /** 回復量の割合増し */
+  healPct?: number;
+  /** 与える出血の割合増し */
+  bleedPct?: number;
+}
+
+/** アクセサリ（指輪・タリスマン。呼び名が違うだけ） */
+export interface Accessory {
+  name: string;
+  kind: '指輪' | 'タリスマン';
+  weight: number;
+  effect: AccessoryEffect;
+}
+
 /** 武器へのエンチャント。重ね掛けはできず、新しく掛けると前のものは消える */
 export interface Enchant {
   name: string;
@@ -160,6 +188,8 @@ export interface Fighter {
   curse?: number;
   /** この戦闘で呪死してレベルを失った回数（戦闘後にキャラへ反映） */
   drained?: number;
+  /** アクセサリによる戦闘中の効果 */
+  acc?: { guardDiscount: number; healPct: number; bleedPct: number };
   buffs: Buffs;
 }
 
