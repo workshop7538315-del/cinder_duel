@@ -1,4 +1,8 @@
-import { charLevel, checkCharacter, loadout, loseLevels, type Character } from '../character/model';
+import { allocTotal, charLevel, checkCharacter, levelBudget, levelUpAtBonfire, loadout, loseLevels, type Character } from '../character/model';
+import { STAT_NAMES, STAT_ORDER } from '../data/classes';
+import { RULES } from '../data/rules';
+import { levelCost } from '../engine/stats';
+import type { StatKey } from '../engine/types';
 import { CARDS } from '../data/cards';
 import { CATACOMBS, type LootDef } from '../data/catacombs';
 import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
@@ -32,6 +36,8 @@ let notice = '';
 /** 探索が終わったときの結果 */
 let result: { run: RunState; banked: Banked } | null = null;
 let confirmAbandon = false;
+/** 篝火でレベルを上げる欄を開いているか */
+let lvPanel = false;
 
 export const lootName = (l: LootDef): string =>
   l.kind === 'card' ? `カード「${CARDS[l.id].name}」` : (WEAPONS[l.id] ?? SHIELDS[l.id] ?? ARMORS[l.id]).name;
@@ -240,7 +246,8 @@ function renderRun(): void {
         <button type="button" class="btn ${rested ? '' : 'primary'}" data-run="rest" ${rested ? 'disabled' : ''}>${rested ? '休んだ' : '休む'}</button>
         <button type="button" class="btn ${rested ? 'primary' : ''}" data-run="next">${run.room === dungeon.floors[run.floor].length - 1 ? `先へ進む（地下${run.floor + 2}層へ）` : '先へ進む'}</button>
         <button type="button" class="btn" data-run="retreat">退却する（持ち帰る）</button>
-      </div></div>`;
+        <button type="button" class="btn ${lvPanel ? 'on' : ''}" data-run="lv-toggle">レベルを上げる</button>
+      </div>${lvPanel ? bonfireLevelHTML(c, run) : ''}</div>`;
   }
 
   const abandon = confirmAbandon
@@ -254,6 +261,32 @@ function renderRun(): void {
     ${action}
     <div class="preview">${mapHTML(dungeon, run)}</div>
     ${abandon}`;
+}
+
+/** 篝火でレベルを上げる欄。持ち歩いているソウルから先に払う */
+function bonfireLevelHTML(c: Character, r: RunState): string {
+  const lo = loadout(c);
+  const free = levelBudget(c) - allocTotal(c.alloc);
+  const cost = levelCost(lo.level);
+  const can = free > 0 || r.souls + c.souls >= cost;
+  return `<div class="bf-lv">
+    <p class="note">Lv <b>${lo.level}</b>・${free > 0 ? `振れるポイントが${free}残っています` : `次のレベル <b>${cost}</b> ソウル`}
+      （持ち歩き ${r.souls}＋貯め ${c.souls}）</p>
+    <p class="note dim">持ち歩いているソウルから先に使います。上げたレベルは、この探索で倒れても諦めても戻りません。</p>
+    <div class="bf-stats">${STAT_ORDER.map((k) => `<button type="button" class="btn" data-lv="${k}" ${can && lo.stats[k] < RULES.statMax ? '' : 'disabled'}>
+      ${STAT_NAMES[k]} <b>${lo.stats[k]}</b> ＋</button>`).join('')}</div></div>`;
+}
+
+function bonfireLevelUp(stat: StatKey): void {
+  const c = charId ? findCharacter(charId) : undefined;
+  if (!c || !run) return;
+  const r = levelUpAtBonfire(c, stat, run.souls);
+  if (!r) return;
+  upsertCharacter(r.character);
+  run = { ...run, souls: r.carried };
+  saveRun(run);
+  notice = `${STAT_NAMES[stat]}を上げた。Lv${charLevel(r.character)}になった。`;
+  renderRun();
 }
 
 /** レベルが足りないまま底に入ったときの、脱出を勧める警告（最初の部屋にいるあいだ出す） */
@@ -318,6 +351,7 @@ function step(next: RunState, msg = ''): void {
   notice = [msg, clueNotice].filter(Boolean).join(' ');
   clueNotice = '';
   confirmAbandon = false;
+  lvPanel = false;
   if (next.status !== 'active') return finish(next);
   saveRun(next);
   show('run');
@@ -409,6 +443,8 @@ export function bindCatacombs(): void {
   $('#dgBack').addEventListener('click', () => onBack());
 
   $('#runBody').addEventListener('click', (ev) => {
+    const lv = (ev.target as HTMLElement).closest<HTMLElement>('[data-lv]')?.dataset.lv;
+    if (lv) return bonfireLevelUp(lv as StatKey);
     const act = (ev.target as HTMLElement).closest<HTMLElement>('[data-run]')?.dataset.run;
     if (!act || !dungeon || !run) return;
     const room = currentRoom(dungeon, run);
@@ -419,6 +455,9 @@ export function bindCatacombs(): void {
         if (room?.clue && !isLooted(run)) foundClue(room.clue);
         return step(openChest(dungeon, run),
           isLooted(run) ? '' : room?.loot ? `宝箱から「${lootName(room.loot)}」を見つけた。` : `宝箱にはソウルが残っていた。ソウル +${room?.souls ?? 0}。`);
+      case 'lv-toggle':
+        lvPanel = !lvPanel;
+        return renderRun();
       case 'rest':
         return step(rest(run), '篝火で休んだ。HPとFPが戻った。');
       case 'next':

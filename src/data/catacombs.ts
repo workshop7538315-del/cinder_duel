@@ -31,6 +31,12 @@ const sage = { head: 'sage_hood', chest: 'sage_robe', arms: 'travel_gloves', leg
 const knight = { head: 'knight_helm', chest: 'knight_armor', arms: 'knight_gauntlets', legs: 'knight_greaves' };
 const iron = { head: 'iron_helm', chest: 'iron_armor', arms: 'iron_gauntlets', legs: 'iron_greaves' };
 
+/** 地下墓の最初の部屋にいる、弱い亡者（第2版のシードから） */
+export const HOLLOW: EnemyDef = {
+  name: '亡者', classId: 'wretch', focus: { vit: 1, str: 1 },
+  equip: { right: 'hollow_blade', left: null, head: null, chest: null, arms: null, legs: null },
+};
+
 const item = (id: string, tier: 1 | 2 | 3): LootDef => ({ kind: 'item', id, tier });
 const card = (id: string, tier: 1 | 2 | 3): LootDef => ({ kind: 'card', id, tier });
 
@@ -141,6 +147,8 @@ export const DUNGEON = {
   enemyRoomStep: 1,
   /** 主のレベル = 自分のレベル + bossLevelOffset + 階層×floorStep */
   bossLevelOffset: -2,
+  /** 最初の部屋の亡者のレベル = 自分のレベル + hollowLevelOffset（第2版のシードから） */
+  hollowLevelOffset: -10,
   /** 困難な地下墓は書いたレベルが基本だが、自分のほうが高ければ「自分のレベル＋この値」になる */
   fixedAboveEnemy: 2,
   fixedAboveBoss: 5,
