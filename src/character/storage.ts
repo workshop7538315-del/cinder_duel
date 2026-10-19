@@ -2,10 +2,12 @@ import { CARDS } from '../data/cards';
 import { CLASSES, STAT_ORDER } from '../data/classes';
 import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
 import { RULES } from '../data/rules';
-import { newId, zeroStats, type Character, type Equip, type EquipSlot } from './model';
+import {
+  classKit, inventoryOf, mergeInventory, newId, zeroStats, type Character, type Equip, type EquipSlot, type Inventory,
+} from './model';
 
 /** 保存形式のバージョン。形式を変えたら上げて、migrate に変換を足す。 */
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 export const STORAGE_KEY = 'cinder_duel.save';
 
 export interface SaveData {
@@ -19,7 +21,8 @@ export const emptySave = (): SaveData => ({ version: SAVE_VERSION, characters: [
 function migrate(raw: { version?: unknown; characters?: unknown }): { characters: unknown[] } {
   const v = typeof raw.version === 'number' ? raw.version : 0;
   if (v > SAVE_VERSION) throw new Error('新しいバージョンのゲームで作られたデータです。ページを再読み込みしてください。');
-  // v1 が最初の形式なので、いまは変換なし
+  // v1 → v2: 持ち物とソウルが増えた。持ち物がないキャラは sanitizeCharacter で
+  //          「素性の初期装備・カード＋いま装備しているもの・デッキに入っているもの」を持っていることにする
   return { characters: Array.isArray(raw.characters) ? raw.characters : [] };
 }
 
@@ -49,6 +52,10 @@ export function sanitizeCharacter(raw: unknown): Character | null {
   const equip = {} as Equip;
   for (const s of SLOTS) equip[s] = validItem(s, re[s]);
   const deck = Array.isArray(r.deck) ? r.deck.filter((x): x is string => typeof x === 'string' && !!CARDS[x]) : [];
+  const inventory = r.inventory && typeof r.inventory === 'object'
+    ? sanitizeInventory(r.inventory as Record<string, unknown>)
+    : mergeInventory(classKit(r.classId), inventoryOf(equip, deck));
+  const souls = Number(r.souls);
   const now = Date.now();
   return {
     id: typeof r.id === 'string' && r.id ? r.id : newId(),
@@ -57,9 +64,24 @@ export function sanitizeCharacter(raw: unknown): Character | null {
     alloc,
     equip,
     deck,
+    inventory,
+    souls: Number.isFinite(souls) && souls > 0 ? Math.floor(souls) : 0,
     createdAt: typeof r.createdAt === 'number' ? r.createdAt : now,
     updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : now,
   };
+}
+
+const isItem = (id: string) => !!(WEAPONS[id] || SHIELDS[id] || ARMORS[id]);
+
+function sanitizeInventory(r: Record<string, unknown>): Inventory {
+  const items = Array.isArray(r.items) ? [...new Set(r.items.filter((x): x is string => typeof x === 'string' && isItem(x)))] : [];
+  const cards: Record<string, number> = {};
+  const rc = (r.cards ?? {}) as Record<string, unknown>;
+  for (const [id, n] of Object.entries(rc)) {
+    const k = Math.floor(Number(n));
+    if (CARDS[id] && Number.isFinite(k) && k > 0) cards[id] = Math.min(k, 99);
+  }
+  return { items, cards };
 }
 
 export function parseSave(text: string): SaveData {

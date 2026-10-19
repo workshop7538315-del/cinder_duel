@@ -9,6 +9,14 @@ import type { ArmorSlot, Cut, HandItem, School, StatKey, Stats, Weapon, WeightCl
 export type EquipSlot = 'right' | 'left' | ArmorSlot;
 export type Equip = Record<EquipSlot, string | null>;
 
+/** 持ち物。装備とカードは持っているものしか使えない */
+export interface Inventory {
+  /** 持っている装備のID（同じものは1つで足りる） */
+  items: string[];
+  /** 持っているカードの枚数 */
+  cards: Record<string, number>;
+}
+
 /** 保存されるキャラクター */
 export interface Character {
   id: string;
@@ -19,6 +27,9 @@ export interface Character {
   equip: Equip;
   /** カードIDの並び（同名は複数入る） */
   deck: string[];
+  inventory: Inventory;
+  /** 持っているソウル */
+  souls: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -115,34 +126,60 @@ export function cardBlock(id: string, stats: Stats, schools: School[], right?: W
   return null;
 }
 
-/** 能力値と装備から、使えるカードで自動的にデッキを組む */
-export function autoDeck(stats: Stats, schools: School[], right?: Weapon, size = 15): string[] {
+/** 能力値と装備から、使えるカードで自動的にデッキを組む（owned を渡すと持っている枚数まで） */
+export function autoDeck(stats: Stats, schools: School[], right?: Weapon, owned?: Record<string, number>, size = 15): string[] {
   const deck: string[] = [];
-  for (const [id, n] of AUTO_DECK_PRIORITY) {
-    if (cardBlock(id, stats, schools, right)) continue;
-    for (let i = 0; i < n && deck.length < size; i++) deck.push(id);
-  }
-  // 足りなければ条件なしのカードで埋める
-  for (const id of ['kick', 'stance', 'breath', 'insight', 'oil']) {
-    if (cardBlock(id, stats, schools, right)) continue;
+  const limit = (id: string) => Math.min(RULES.copyLimit, owned ? owned[id] ?? 0 : RULES.copyLimit);
+  const add = (id: string, n: number, upTo: number) => {
+    if (cardBlock(id, stats, schools, right)) return;
     const have = deck.filter((x) => x === id).length;
-    for (let i = have; i < RULES.copyLimit && deck.length < RULES.deckMin; i++) deck.push(id);
-  }
+    for (let i = have; i < Math.min(n, limit(id)) && deck.length < upTo; i++) deck.push(id);
+  };
+  for (const [id, n] of AUTO_DECK_PRIORITY) add(id, n, size);
+  // 足りなければ条件なしのカードで埋める
+  for (const id of ['kick', 'stance', 'breath', 'insight', 'oil', 'flask', 'knife']) add(id, RULES.copyLimit, RULES.deckMin);
+  // それでも足りなければ、持っているカードを何でも
+  if (owned) for (const id of Object.keys(owned)) add(id, RULES.copyLimit, RULES.deckMin);
   return deck;
 }
+
+/* ---------------- 持ち物 ---------------- */
+
+const equipIds = (e: Equip): string[] => Object.values(e).filter((x): x is string => !!x);
+
+/** 素性の初期装備と初期カード（素性の初期能力値で使えるもの） */
+export function classKit(classId: string): Inventory {
+  const cls = CLASSES[classId];
+  const base = { classId, alloc: zeroStats(), equip: cls.equip };
+  const lo = loadout(base);
+  return { items: equipIds(cls.equip), cards: countCards(autoDeck(lo.stats, lo.schools, lo.right)) };
+}
+
+/** 装備とデッキをそのまま持ち物にする（敵やプリセット用） */
+export const inventoryOf = (equip: Equip, deck: string[]): Inventory => ({ items: equipIds(equip), cards: countCards(deck) });
+
+/** 2つの持ち物を合わせる（カードは多い方の枚数） */
+export function mergeInventory(a: Inventory, b: Inventory): Inventory {
+  const cards = { ...a.cards };
+  for (const [id, n] of Object.entries(b.cards)) cards[id] = Math.max(cards[id] ?? 0, n);
+  return { items: [...new Set([...a.items, ...b.items])], cards };
+}
+
+export const ownsItem = (c: Character, id: string): boolean => c.inventory.items.includes(id);
+export const ownedCards = (c: Character, id: string): number => c.inventory.cards[id] ?? 0;
+const deckFromCounts = (m: Record<string, number>): string[] => Object.entries(m).flatMap(([id, n]) => Array(n).fill(id));
 
 /* ---------------- 作成と検証 ---------------- */
 
 export function newCharacter(classId: string, name?: string): Character {
   const cls = CLASSES[classId];
   const now = Date.now();
-  const c: Character = {
+  const inventory = classKit(classId);
+  return {
     id: newId(), name: name ?? cls.name, classId,
-    alloc: zeroStats(), equip: { ...cls.equip }, deck: [], createdAt: now, updatedAt: now,
+    alloc: zeroStats(), equip: { ...cls.equip }, deck: deckFromCounts(inventory.cards),
+    inventory, souls: 0, createdAt: now, updatedAt: now,
   };
-  const lo = loadout(c);
-  c.deck = autoDeck(lo.stats, lo.schools, lo.right);
-  return c;
 }
 
 export interface Issues {
@@ -177,6 +214,9 @@ export function checkCharacter(c: Character, opts: CheckOptions = {}): Issues {
 
   const lo = loadout(c);
   if (c.equip.left && WEAPONS[c.equip.left]?.kind === 'weapon') errors.push('左手には盾か触媒しか持てません。');
+  for (const id of equipIds(c.equip)) {
+    if (!ownsItem(c, id)) errors.push(`「${(WEAPONS[id] ?? SHIELDS[id] ?? ARMORS[id])?.name ?? id}」を持っていません。`);
+  }
   const miss = (item: { name: string; req: Partial<Record<string, number>> }) =>
     unmetReq(item.req, stats).map(([k, v]) => `${STAT_NAMES[k as StatKey]}${v}`).join('・');
   if (!lo.rightOk) warnings.push(`${lo.right.name}は能力不足（${miss(lo.right)}が必要）。攻撃力が下がり、補正も効きません。`);
@@ -192,6 +232,7 @@ export function checkCharacter(c: Character, opts: CheckOptions = {}): Issues {
       continue;
     }
     if (k > RULES.copyLimit) errors.push(`「${card.name}」は${RULES.copyLimit}枚までです。`);
+    else if (k > ownedCards(c, id)) errors.push(`「${card.name}」は${ownedCards(c, id)}枚しか持っていません。`);
     const why = cardBlock(id, stats, lo.schools, lo.right);
     if (why) errors.push(why.endsWith('が必要') ? `「${card.name}」を使うには${why}です。` : `「${card.name}」は使えません（${why}）。`);
   }

@@ -103,10 +103,12 @@ function render(): void {
 
   // 装備
   const stats = lo.stats;
-  const weaponList = Object.entries(WEAPONS).map(([id, w]) => [id, `${w.name}（${kg(w.weight)}）${meetsReq(w.req, stats) ? '' : ' ※能力不足'}`] as [string, string]);
+  // 持っている装備だけを選べる
+  const own = (id: string) => c.inventory.items.includes(id);
+  const weaponList = Object.entries(WEAPONS).filter(([id]) => own(id)).map(([id, w]) => [id, `${w.name}（${kg(w.weight)}）${meetsReq(w.req, stats) ? '' : ' ※能力不足'}`] as [string, string]);
   const leftList: [string, string][] = [
-    ...Object.entries(SHIELDS).map(([id, s]) => [id, `${s.name}（${kg(s.weight)}）${meetsReq(s.req, stats) ? '' : ' ※能力不足'}`] as [string, string]),
-    ...Object.entries(WEAPONS).filter(([, w]) => w.kind === 'catalyst')
+    ...Object.entries(SHIELDS).filter(([id]) => own(id)).map(([id, s]) => [id, `${s.name}（${kg(s.weight)}）${meetsReq(s.req, stats) ? '' : ' ※能力不足'}`] as [string, string]),
+    ...Object.entries(WEAPONS).filter(([id, w]) => w.kind === 'catalyst' && own(id))
       .map(([id, w]) => [id, `${w.name}（${kg(w.weight)}）${meetsReq(w.req, stats) ? '' : ' ※能力不足'}`] as [string, string]),
   ];
   const slotRow = (slot: EquipSlot, label: string, list: [string, string][], none: string, detail: string) => `
@@ -114,7 +116,7 @@ function render(): void {
       <select id="eq-${slot}" data-slot="${slot}">${options(list, c.equip[slot], none)}</select>
       <p class="eq-detail">${detail}</p></div>`;
   const armorRows = ARMOR_SLOTS.map(({ slot, name }) => {
-    const list = Object.entries(ARMORS).filter(([, a]) => a.slot === slot).map(([id, a]) => [id, `${a.name}（${kg(a.weight)}）`] as [string, string]);
+    const list = Object.entries(ARMORS).filter(([id, a]) => a.slot === slot && own(id)).map(([id, a]) => [id, `${a.name}（${kg(a.weight)}）`] as [string, string]);
     const a = c.equip[slot] ? ARMORS[c.equip[slot]!] : null;
     const detail = a ? `重さ ${kg(a.weight)}　カット 物理${pct(a.cut.phys)}・魔力${pct(a.cut.magic)}・聖${pct(a.cut.holy)}` : '<span class="dim">なし</span>';
     return slotRow(slot, name, list, 'なし', detail);
@@ -130,16 +132,18 @@ function render(): void {
 
   // デッキ
   const counts = countCards(c.deck);
-  const cardRows = Object.entries(CARDS).map(([id, card]) => {
+  // 持っているカードだけを並べる
+  const cardRows = Object.entries(CARDS).filter(([id]) => (c.inventory.cards[id] ?? 0) > 0 || counts[id]).map(([id, card]) => {
     const n = counts[id] ?? 0;
+    const have = c.inventory.cards[id] ?? 0;
     const block = cardBlock(id, stats, lo.schools, lo.right);
-    const canAdd = !block && n < RULES.copyLimit && c.deck.length < RULES.deckMax;
+    const canAdd = !block && n < Math.min(RULES.copyLimit, have) && c.deck.length < RULES.deckMax;
     return `<div class="dk-row ${block ? 'blocked' : ''} ${n ? 'in' : ''}">
       <div class="dk-main"><span class="dk-kind">${card.kind}</span><b>${card.name}</b> <span class="dk-cost">${costLabel(card.cost, card.fp)}</span>
         <p>${card.text(null)}${card.req ? `　<span class="dim">必要 ${reqLabel(card.req)}</span>` : ''}${block ? `　<b class="warn">${block}</b>` : ''}</p></div>
       <div class="dk-count">
         <button type="button" data-card="${id}" data-d="-1" aria-label="${card.name}を減らす" ${n ? '' : 'disabled'}>−</button>
-        <output>${n}</output>
+        <output>${n}<small>/${have}</small></output>
         <button type="button" data-card="${id}" data-d="1" aria-label="${card.name}を増やす" ${canAdd ? '' : 'disabled'}>＋</button>
       </div></div>`;
   }).join('');
@@ -159,6 +163,7 @@ function render(): void {
     </section>
     <section class="ed-sec">
       <h2 class="ed-h">装備</h2>
+      <p class="note">選べるのは持っている装備だけです。新しい装備は地下墓で手に入ります。</p>
       ${slotRow('right', '右手', weaponList, '素手', handDetail(c.equip.right ? lo.right : null, stats))}
       ${slotRow('left', '左手', leftList, 'なし', handDetail(lo.left, stats))}
       ${armorRows}
@@ -214,7 +219,7 @@ function onClick(ev: Event): void {
   if (dk) {
     if (dk.dataset.deck === 'auto') {
       const lo = loadout(c);
-      c.deck = autoDeck(lo.stats, lo.schools, lo.right);
+      c.deck = autoDeck(lo.stats, lo.schools, lo.right, c.inventory.cards);
     } else c.deck = [];
     return render();
   }

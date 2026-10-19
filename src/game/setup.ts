@@ -34,3 +34,11 @@ export function makeFighter(c: Character, isPlayer: boolean): Fighter {
     buffs: {},
   };
 }
+
+/** 最大HPに倍率を掛ける（地下墓の道中の敵など） */
+export function scaleHp(f: Fighter, ratio = 1): Fighter {
+  if (ratio === 1) return f;
+  f.maxHp = Math.max(1, Math.round(f.maxHp * ratio));
+  f.hp = f.maxHp;
+  return f;
+}

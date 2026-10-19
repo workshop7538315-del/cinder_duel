@@ -1,5 +1,6 @@
 import { watchAccount } from '../net/cloud';
 import { bindBattle } from './battle';
+import { bindCatacombs } from './catacomb';
 import { bindEditor } from './editor';
 import { gateAccount, gateAccountUnavailable, startGate } from './gate';
 import { bindHome, openHome } from './home';
@@ -11,6 +12,7 @@ export function initApp(): void {
   bindEditor();
   bindVersus();
   bindBattle();
+  bindCatacombs();
   openHome();
   startGate();
   watchAccount((a) => {

@@ -1,6 +1,7 @@
 import { checkCharacter } from '../character/model';
 import { mergeSave, parseSave, serializeSave } from '../character/storage';
 import { RULES } from '../data/rules';
+import { hasActiveRun, openCatacombs } from './catacomb';
 import { $, esc, show } from './dom';
 import { openEditor } from './editor';
 import { signInWithDiscord, signOut } from '../net/cloud';
@@ -52,9 +53,11 @@ function render(): void {
           ? `<button type="button" class="btn danger" data-del-yes="${c.id}">本当に削除</button><button type="button" class="btn" data-del-no>やめる</button>`
           : `<button type="button" class="btn" data-del="${c.id}">削除</button>`;
         return `<article class="char">
-          <div class="char-main"><b>${esc(c.name)}</b>${bad ? '<span class="badge">要修正</span>' : ''}<span>${charSummary(c)}</span></div>
+          <div class="char-main"><b>${esc(c.name)}</b>${bad ? '<span class="badge">要修正</span>' : ''}<span>${charSummary(c)}</span>
+            <span class="souls">ソウル ${c.souls}</span></div>
           <div class="char-btns">
-            <button type="button" class="btn primary" data-fight="${c.id}" ${bad ? 'disabled' : ''}>戦う</button>
+            <button type="button" class="btn primary" data-dungeon="${c.id}" ${bad && !hasActiveRun(c.id) ? 'disabled' : ''}>${hasActiveRun(c.id) ? '地下墓の続き' : '地下墓へ'}</button>
+            <button type="button" class="btn" data-fight="${c.id}" ${bad ? 'disabled' : ''}>練習試合</button>
             <button type="button" class="btn" data-edit="${c.id}">編集</button>${del}
           </div></article>`;
       }).join('')
@@ -108,6 +111,8 @@ export function bindHome(): void {
   $('#charList').addEventListener('click', (ev) => {
     const t = ev.target as HTMLElement;
     const get = (k: string) => t.closest<HTMLElement>(`[data-${k}]`)?.dataset;
+    const dg = get('dungeon')?.dungeon;
+    if (dg) return openCatacombs(dg, () => openHome());
     const fight = get('fight')?.fight;
     if (fight) return openVersus(fight, () => openHome());
     const edit = get('edit')?.edit;
