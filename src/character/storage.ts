@@ -1,6 +1,7 @@
 import { CARDS } from '../data/cards';
 import { CLASSES, STAT_ORDER } from '../data/classes';
 import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
+import { FIXED_CATACOMBS } from '../data/fixed';
 import { RULES } from '../data/rules';
 import {
   classKit, inventoryOf, mergeInventory, newId, zeroStats, type Character, type Equip, type EquipSlot, type Inventory,
@@ -66,6 +67,7 @@ export function sanitizeCharacter(raw: unknown): Character | null {
     deck,
     inventory,
     souls: Number.isFinite(souls) && souls > 0 ? Math.floor(souls) : 0,
+    clues: Array.isArray(r.clues) ? [...new Set(r.clues.filter((x): x is string => typeof x === 'string' && !!FIXED_CATACOMBS[x]))] : [],
     createdAt: typeof r.createdAt === 'number' ? r.createdAt : now,
     updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : now,
   };
