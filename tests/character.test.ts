@@ -125,7 +125,7 @@ describe('持ち物', () => {
     for (const id of Object.keys(CLASSES)) {
       const c = newCharacter(id);
       const kit = classKit(id);
-      expect(c.inventory).toEqual(kit);
+      expect(c.inventory).toEqual({ ...kit, crystals: [] });
       expect(c.deck.length).toBeGreaterThanOrEqual(RULES.deckMin);
       expect(c.souls).toBe(0);
     }

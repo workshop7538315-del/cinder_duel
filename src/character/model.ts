@@ -5,7 +5,7 @@ import { ARMORS, FISTS, SHIELDS, WEAPONS, WEIGHTS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { reqLabel } from '../engine/format';
 import { derive, levelCost, levelOf, meetsReq, unmetReq, weightKey } from '../engine/stats';
-import type { Accessory, ArmorSlot, Cut, HandItem, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
+import type { Accessory, ArmorSlot, Crystal, CrystalKey, Mods, Cut, HandItem, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
 
 export type EquipSlot = 'right' | 'left' | ArmorSlot;
 export type Equip = Record<EquipSlot, string | null>;
@@ -16,6 +16,8 @@ export interface Inventory {
   items: string[];
   /** 持っているカードの枚数 */
   cards: Record<string, number>;
+  /** 持っている淵結晶 */
+  crystals?: Crystal[];
 }
 
 /** 保存されるキャラクター */
@@ -31,6 +33,8 @@ export interface Character {
   inventory: Inventory;
   /** 持っているソウル */
   souls: number;
+  /** 底の武器にはめた淵結晶（武器ID → 穴ごとの淵結晶の uid） */
+  sockets?: Record<string, (string | null)[]>;
   /** 身につけているアクセサリ（指輪・タリスマン）。4つまで */
   accessories?: string[];
   /** 地下墓ごとに、踏破した周回の最高（CATACOMBS のキー → 周回） */
@@ -105,15 +109,36 @@ export interface Loadout {
   schools: School[];
   derived: ReturnType<typeof derive>;
   accessories: Accessory[];
-  /** アクセサリによる戦闘中の効果 */
-  acc: { guardDiscount: number; healPct: number; bleedPct: number };
+  /** アクセサリ・淵結晶による戦闘中の効果 */
+  acc: Mods;
+  /** 装備している武器にはまっている淵結晶 */
+  crystals: Crystal[];
+}
+
+/** 武器にはまっている淵結晶（持っていないもの・知らないものは除く） */
+export function socketedCrystals(c: Partial<Pick<Character, 'inventory' | 'sockets'>>, weaponId: string | null): Crystal[] {
+  if (!weaponId) return [];
+  const slots = WEAPONS[weaponId]?.sockets ?? 0;
+  const owned = c.inventory?.crystals ?? [];
+  return (c.sockets?.[weaponId] ?? []).slice(0, slots)
+    .map((uid) => owned.find((x) => x.uid === uid)).filter((x): x is Crystal => !!x);
+}
+
+/** 淵結晶の効果の合計（マイナスは引く） */
+export function crystalTotals(list: Crystal[]): Record<CrystalKey, number> {
+  const t = { atk: 0, art: 0, spell: 0, bleed: 0, curse: 0, hp: 0, fp: 0, cut: 0, guard: 0, stMax: 0 } as Record<CrystalKey, number>;
+  for (const x of list) {
+    t[x.plus.key] += x.plus.value;
+    if (x.minus) t[x.minus.key] -= x.minus.value;
+  }
+  return t;
 }
 
 /** 身につけているアクセサリ（知らないIDと重複は除く） */
 export const accessoryItems = (ids: string[] | undefined): Accessory[] =>
   [...new Set(ids ?? [])].slice(0, RULES.accessorySlots).map((id) => ACCESSORIES[id]).filter((a): a is Accessory => !!a);
 
-export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip' | 'npc' | 'accessories'>): Loadout {
+export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip' | 'npc' | 'accessories'> & Partial<Pick<Character, 'inventory' | 'sockets'>>): Loadout {
   const base = charStats(c);
   const accs = accessoryItems(c.accessories);
   // アクセサリの能力値は、装備条件と補正に効くがレベルには数えない
@@ -121,11 +146,16 @@ export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip' | 'npc'
   for (const a of accs) for (const [k, v] of Object.entries(a.effect.stats ?? {}) as [StatKey, number][]) stats[k] = Math.min(RULES.statMax, stats[k] + v);
   const d0 = derive(stats);
   const sum = (f: (a: Accessory) => number | undefined) => accs.reduce((n, a) => n + (f(a) ?? 0), 0);
+  // 両手の武器にはまっている淵結晶
+  const crystals = [...socketedCrystals(c, c.equip.right), ...(c.equip.left !== c.equip.right ? socketedCrystals(c, c.equip.left) : [])];
+  const ct = crystalTotals(crystals);
+  const stMax = Math.max(1, d0.stMax + ct.stMax);
   const derived = {
     ...d0,
-    maxHp: Math.floor(d0.maxHp * (1 + sum((a) => a.effect.hpPct))),
-    maxFp: d0.maxFp + sum((a) => a.effect.fp),
-    stInit: Math.min(d0.stMax, d0.stInit + sum((a) => a.effect.stInit)),
+    maxHp: Math.max(1, Math.floor(d0.maxHp * (1 + sum((a) => a.effect.hpPct) + ct.hp))),
+    maxFp: Math.max(0, d0.maxFp + sum((a) => a.effect.fp) + ct.fp),
+    stMax,
+    stInit: Math.min(stMax, d0.stInit + sum((a) => a.effect.stInit)),
   };
   const right = rightItem(c.equip);
   const left = leftItem(c.equip);
@@ -138,11 +168,22 @@ export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip' | 'npc'
     leftOk: !left || !!c.npc || meetsReq(left.req, stats),
     weight, equipLoad: derived.equipLoad, ratio,
     weightClass: WEIGHTS[weightKey(ratio)],
-    armorCut: addCut(armorCut(c.equip), accs),
+    armorCut: crystalCut(addCut(armorCut(c.equip), accs), ct.cut),
     schools, derived,
     accessories: accs,
-    acc: { guardDiscount: sum((a) => a.effect.guardDiscount), healPct: sum((a) => a.effect.healPct), bleedPct: sum((a) => a.effect.bleedPct) },
+    acc: {
+      guardDiscount: sum((a) => a.effect.guardDiscount) + ct.guard, healPct: sum((a) => a.effect.healPct), bleedPct: sum((a) => a.effect.bleedPct),
+      atkPct: ct.atk, artPct: ct.art, spellPct: ct.spell, bleedAdd: ct.bleed, curseAdd: ct.curse,
+    },
+    crystals,
   };
+}
+
+/** 淵結晶のカット率（全属性に足す。0〜0.95 に収める） */
+function crystalCut(cut: Cut, v: number): Cut {
+  if (!v) return cut;
+  const f = (x: number) => Math.round(Math.min(0.95, Math.max(0, x + v)) * 100) / 100;
+  return { phys: f(cut.phys), magic: f(cut.magic), holy: f(cut.holy) };
 }
 
 function addCut(cut: Cut, accs: Accessory[]): Cut {
@@ -220,11 +261,11 @@ const deckFromCounts = (m: Record<string, number>): string[] => Object.entries(m
 export function newCharacter(classId: string, name?: string): Character {
   const cls = CLASSES[classId];
   const now = Date.now();
-  const inventory = classKit(classId);
+  const inventory = { ...classKit(classId), crystals: [] };
   return {
     id: newId(), name: name ?? cls.name, classId,
     alloc: zeroStats(), equip: { ...cls.equip }, deck: deckFromCounts(inventory.cards),
-    inventory, souls: 0, clues: [], abyssCleared: [], accessories: [], cycles: {}, freeLevels: RULES.levelBudget, lostLevels: 0, boughtLevels: 0, createdAt: now, updatedAt: now,
+    inventory, souls: 0, clues: [], abyssCleared: [], accessories: [], cycles: {}, sockets: {}, freeLevels: RULES.levelBudget, lostLevels: 0, boughtLevels: 0, createdAt: now, updatedAt: now,
   };
 }
 

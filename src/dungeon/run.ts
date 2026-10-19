@@ -1,4 +1,5 @@
-import type { Character } from '../character/model';
+import { newId, type Character } from '../character/model';
+import type { Crystal } from '../engine/types';
 import { DUNGEON, type LootDef } from '../data/catacombs';
 import type { Dungeon, Room } from './generate';
 
@@ -46,6 +47,8 @@ export interface RunState {
   atEntrance?: boolean;
   /** 周回（なければ1周目） */
   cycle?: number;
+  /** 深海: 潜るたびに変わる値 */
+  salt?: string;
 }
 
 export function startRun(charId: string, d: Dungeon): RunState {
@@ -53,6 +56,7 @@ export function startRun(charId: string, d: Dungeon): RunState {
     charId, catacombId: d.catacombId, seed: d.seed, level: d.level,
     floor: 0, room: 0, hp: null, fp: null, souls: 0, loot: [], status: 'active', stain: null, looted: [], deaths: 0,
     ...(d.cycle && d.cycle > 1 ? { cycle: d.cycle } : {}),
+    ...(d.salt ? { salt: d.salt } : {}),
   };
 }
 
@@ -166,19 +170,27 @@ export interface Banked {
   dupes: string[];
   /** 主を倒していない階層で拾ったので、置いてきたもの */
   left: LootDef[];
+  /** 持ち帰った淵結晶 */
+  crystals: Crystal[];
 }
 
 /** 持ち帰ったものをキャラに加える（踏破・退却のときだけ） */
 export function bankRun(c: Character, run: RunState): { character: Character; banked: Banked } {
-  const banked: Banked = { souls: 0, items: [], cards: [], dupes: [], left: [] };
+  const banked: Banked = { souls: 0, items: [], cards: [], dupes: [], left: [], crystals: [] };
   if (run.status !== 'cleared' && run.status !== 'retreated') return { character: c, banked };
   const items = [...c.inventory.items];
   const cards = { ...c.inventory.cards };
+  const crystals = [...(c.inventory.crystals ?? [])];
   let souls = run.souls;
   const secured = securedLoot(run);
   banked.left = run.loot.filter((l) => !secured.includes(l));
   for (const l of secured) {
-    if (l.kind === 'card') {
+    if (l.kind === 'crystal') {
+      if (!l.crystal) continue;
+      const got = { ...l.crystal, uid: newId() };
+      crystals.push(got);
+      banked.crystals.push(got);
+    } else if (l.kind === 'card') {
       cards[l.id] = (cards[l.id] ?? 0) + 1;
       banked.cards.push(l.id);
     } else if (items.includes(l.id)) {
@@ -191,7 +203,7 @@ export function bankRun(c: Character, run: RunState): { character: Character; ba
   }
   banked.souls = souls;
   return {
-    character: { ...c, inventory: { items, cards }, souls: c.souls + souls, updatedAt: Date.now() },
+    character: { ...c, inventory: { items, cards, crystals }, souls: c.souls + souls, updatedAt: Date.now() },
     banked,
   };
 }

@@ -48,7 +48,8 @@ export function catalystFor(f: Fighter, school: School): { item: Weapon; ok: boo
 export function spellPower(f: Fighter, school: School): number | null {
   const c = catalystFor(f, school);
   if (!c || !c.item.power) return null;
-  return c.ok ? scaled(c.item.power, f.stats) : Math.floor(c.item.power.base * RULES.reqPenalty);
+  const p = c.ok ? scaled(c.item.power, f.stats) : Math.floor(c.item.power.base * RULES.reqPenalty);
+  return Math.round(p * (1 + (f.acc?.spellPct ?? 0)));
 }
 
 /** ガード消費: 受けるはずだったダメージが大きいほど重い */

@@ -6,10 +6,11 @@ import { levelCost } from '../engine/stats';
 import type { StatKey } from '../engine/types';
 import { CARDS } from '../data/cards';
 import { CATACOMBS, DUNGEON, type LootDef } from '../data/catacombs';
-import { ABYSS } from '../data/abyss';
+import { CRYSTAL_KINDS, crystalText } from '../data/crystals';
+import { ABYSS, DEEP, DEEP_KEY } from '../data/abyss';
 import { FIXED_CATACOMBS } from '../data/fixed';
 import {
-  abyssBaseLevel, abyssFromSeed, abyssName, abyssSeed, ABYSS_KEYS, buildAbyss, fixedFromSeed, SEA_KEY, generateDungeon, normalizeSeed, pickAbyss, rebuildDungeon, ROOM_NAMES, strayInto, versionedSeed,
+  abyssBaseLevel, abyssFromSeed, buildDeep, deepTarget, abyssName, abyssSeed, ABYSS_KEYS, buildAbyss, fixedFromSeed, SEA_KEY, generateDungeon, normalizeSeed, pickAbyss, rebuildDungeon, ROOM_NAMES, strayInto, versionedSeed,
   type Dungeon, type Room,
 } from '../dungeon/generate';
 import { randomSeed } from '../dungeon/rng';
@@ -42,7 +43,9 @@ let confirmAbandon = false;
 let lvPanel = false;
 
 export const lootName = (l: LootDef): string =>
-  l.kind === 'card' ? `カード「${CARDS[l.id].name}」` : itemName(l.id);
+  l.kind === 'card' ? `カード「${CARDS[l.id].name}」`
+    : l.kind === 'crystal' ? `${l.crystal?.name ?? '淵結晶'}（${l.crystal ? crystalText(l.crystal) : ''}）`
+    : itemName(l.id);
 export const stars = (q: number) => '★'.repeat(1 + Math.round(q * 2)) + '☆'.repeat(2 - Math.round(q * 2));
 
 export const hasActiveRun = (id: string): boolean => !!loadRun(id);
@@ -106,20 +109,49 @@ function cycleHTML(c: Character): string {
     <p class="note dim">踏破: ${done.map(([k, n]) => `${CATACOMBS[k].name.replace('の地下墓', '')} ${n}周目`).join('・')}</p></div>`;
 }
 
-/** 踏破した底（シードで直接入れる） */
+/** その底に入口から直接入れるか（踏破した底。海底は、どれかの底を踏破していれば挑める） */
+export function canEnterAbyss(c: Character, key: string): boolean {
+  const done = c.abyssCleared ?? [];
+  if (done.includes(key)) return true;
+  return key === SEA_KEY && done.some((k) => k !== SEA_KEY);
+}
+/** 深海に挑めるか（海底を踏破している） */
+const canDive = (c: Character): boolean => (c.abyssCleared ?? []).includes(SEA_KEY);
+
+/** 挑める底（シードで直接入れる）と深海 */
 function abyssHTML(c: Character): string {
-  const known = ABYSS_KEYS.filter((k) => (c.abyssCleared ?? []).includes(k));
+  const known = ABYSS_KEYS.filter((k) => canEnterAbyss(c, k));
   if (!known.length) return '';
-  return `<div class="seed-hist"><p class="eyebrow">踏破した底</p>
+  const deep = canDive(c)
+    ? `<div class="deep-box"><p class="eyebrow">深海</p>
+        <p class="note">${esc(DEEP.blurb)} 間取りと、呪われた淵結晶が強めるものは、いまのシード（${esc(normalizeSeed(seed) || '—')}）で決まる。強さとマイナスは潜るたびに変わる。</p>
+        <button type="button" class="btn danger" id="dgDeep" ${normalizeSeed(seed) ? '' : 'disabled'}>このシードで深海へ潜る</button></div>`
+    : `<p class="note dim">海底を踏破すると、深海に挑めるようになる。</p>`;
+  return `<div class="seed-hist"><p class="eyebrow">挑める底</p>
     ${known.map((k) => {
       const sd = abyssSeed(k)!;
       return `<button type="button" class="hist hard ${normalizeSeed(seed) === sd ? 'on' : ''}" data-hist="${esc(sd)}">
-        <b>${abyssName(k)}</b><span>高難度・${k === SEA_KEY ? '2階層9部屋' : '1階層3部屋'}・敵はLv${abyssBaseLevel(charLevel(c))}以上</span><code>${esc(sd)}</code></button>`;
-    }).join('')}</div>`;
+        <b>${abyssName(k)}</b><span>高難度・${k === SEA_KEY ? '2階層9部屋' : '1階層3部屋'}・敵はLv${abyssBaseLevel(charLevel(c))}以上${(c.abyssCleared ?? []).includes(k) ? '・踏破' : ''}</span><code>${esc(sd)}</code></button>`;
+    }).join('')}${deep}</div>`;
 }
 
 /** 底の主（倒さずに出るとレベルを失う相手）の呼び名 */
-const abyssBoss = (key: string) => (key === SEA_KEY ? '海淵の大蛇' : '盗掘者狩り');
+const abyssBoss = (key: string) => (key === SEA_KEY ? '海淵の大蛇' : key === DEEP_KEY ? '深海の大蛇' : '盗掘者狩り');
+
+/** 深海へ潜る（いまのシードで） */
+function dive(): void {
+  const c = charId ? findCharacter(charId) : undefined;
+  const s = normalizeSeed(seed);
+  if (!c || !s || !canDive(c) || checkCharacter(c).errors.length) return;
+  dungeon = buildDeep(s, charLevel(c), randomSeed());
+  run = startRun(c.id, dungeon);
+  const t = CRYSTAL_KINDS[deepTarget(s)];
+  notice = `深海へ潜った。${dungeon.floors.length}階層・全${dungeon.totalRooms}部屋。このシードの呪われた淵結晶は「${t.label}」を強める。${abyssBoss(DEEP_KEY)}を倒さずに脱出すると、レベルを${ABYSS.escapeLevelLoss}失う。`;
+  result = null;
+  saveRun(run);
+  show('run');
+  renderRun();
+}
 
 /** 手がかりで知っている困難な地下墓 */
 function clueHTML(c: Character): string {
@@ -153,8 +185,8 @@ function enter(): void {
   // 踏破した底は、そのシードで直接入れる
   const direct = abyssFromSeed(s);
   if (direct) {
-    if (!(c.abyssCleared ?? []).includes(direct)) {
-      $('#dgBody').insertAdjacentHTML('afterbegin', '<p class="warn">まだ踏破していない底には、シードでは入れません。</p>');
+    if (!canEnterAbyss(c, direct)) {
+      $('#dgBody').insertAdjacentHTML('afterbegin', `<p class="warn">${direct === SEA_KEY ? '海底には、どれかの底を踏破すると挑めます。' : 'まだ踏破していない底には、シードでは入れません。'}</p>`);
       return;
     }
     dungeon = buildAbyss(direct, randomSeed(), charLevel(c));
@@ -205,7 +237,7 @@ function enter(): void {
 
 function resumeRun(saved: RunState): void {
   run = saved;
-  dungeon = rebuildDungeon(saved.catacombId, saved.seed, saved.level, saved.cycle ?? 1);
+  dungeon = rebuildDungeon(saved.catacombId, saved.seed, saved.level, saved.cycle ?? 1, saved.salt ?? '');
   result = null;
   notice = '探索の途中から再開しました。';
   show('run');
@@ -370,6 +402,7 @@ function resultHTML({ run: r, banked }: { run: RunState; banked: Banked }): stri
         <li>ソウル <b>+${banked.souls}</b></li>
         ${banked.items.map((id) => `<li>${ACCESSORIES[id] ? ACCESSORIES[id].kind : '装備'}「${itemName(id)}」を手に入れた</li>`).join('')}
         ${banked.cards.map((id) => `<li>カード「${CARDS[id].name}」を手に入れた</li>`).join('')}
+        ${banked.crystals.map((x) => `<li class="${x.minus ? 'cursed' : ''}">「${x.name}」（${crystalText(x)}）を手に入れた</li>`).join('')}
         ${banked.dupes.map((id) => `<li>「${itemName(id)}」はすでに持っていたのでソウルに替えた</li>`).join('')}
         ${banked.left.map((l) => `<li class="dim">${lootName(l)}は、主を倒していない階層で拾ったので置いてきた</li>`).join('')}
       </ul>`;
@@ -385,9 +418,12 @@ function finish(next: RunState): void {
   const { character, banked } = bankRun(c, next);
   if (next.status === 'cleared' && next.catacombId.startsWith('abyss:')) {
     const key = next.catacombId.slice(6);
-    if (!(character.abyssCleared ?? []).includes(key)) {
+    if (ABYSS_KEYS.includes(key) && !(character.abyssCleared ?? []).includes(key)) {
+      const firstAbyss = !(character.abyssCleared ?? []).some((k) => k !== SEA_KEY);
       character.abyssCleared = [...(character.abyssCleared ?? []), key];
-      notice = [notice, `${abyssName(key)}を踏破した。これからは入口の「踏破した底」から直接入れる（シード「${abyssSeed(key)}」）。`].filter(Boolean).join(' ');
+      const unlock = key === SEA_KEY ? '深海に挑めるようになった（入口の「挑める底」から）。'
+        : firstAbyss ? '海底に挑めるようになった（入口の「挑める底」から）。' : '';
+      notice = [notice, `${abyssName(key)}を踏破した。これからは入口の「挑める底」から直接入れる（シード「${abyssSeed(key)}」）。${unlock}`].filter(Boolean).join(' ');
     }
   }
   if (next.status === 'cleared' && CATACOMBS[next.catacombId]) {
@@ -498,6 +534,7 @@ export function bindCatacombs(): void {
       return renderSelect();
     }
     if (t.closest('#dgGo')) enter();
+    if (t.closest('#dgDeep')) dive();
   });
   $('#dgBody').addEventListener('change', (ev) => {
     const t = ev.target as HTMLInputElement;

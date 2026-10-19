@@ -24,11 +24,12 @@ npm run build    # dist/ に書き出し
 | `src/data/classes.ts` | 素性 |
 | `src/data/equipment.ts` | 重さの区分・武器・触媒・盾・防具 |
 | `src/data/accessories.ts` | アクセサリ（指輪・タリスマン）と、地下墓ごとに出るもの |
+| `src/data/crystals.ts` | 淵結晶（種類・値の幅・底ごとの出やすさ・呪われた淵結晶） |
 | `src/data/cards.ts` | カード |
 | `src/data/presets.ts` | 練習試合の相手（通常・強敵） |
 | `src/data/catacombs.ts` | 地下墓（敵・主・手に入るもの）と地下墓の数値 |
 | `src/data/fixed.ts` | 困難な地下墓（固定の間取り・特定のシード） |
-| `src/data/abyss.ts` | 底（バジリスク・盗掘者狩り・専用の物）、海底（固定の間取り・海底の敵）と底の数値 |
+| `src/data/abyss.ts` | 底（バジリスク・盗掘者狩り・専用の物）、海底（固定の間取り・海底の敵）、深海と底の数値 |
 | `src/engine/` | 画面に依存しないルール処理（ダイス、コストの支払い、補正、ガード） |
 | `src/character/model.ts` | キャラクターのデータと検査（レベル、装備、デッキ） |
 | `src/character/storage.ts` | 保存・書き出し・読み込み（バージョン管理つき） |

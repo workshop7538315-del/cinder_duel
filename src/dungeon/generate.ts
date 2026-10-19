@@ -1,8 +1,10 @@
 import { autoAlloc, autoDeck, inventoryOf, loadout, type Character } from '../character/model';
 import { CATACOMB_ORDER, CATACOMBS, DUNGEON, HOLLOW, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
-import { ABYSS, ABYSS_KEYS, ABYSSES, BASILISK, SEA_KEY, SEAFLOOR } from '../data/abyss';
+import { ABYSS, ABYSS_KEYS, ABYSSES, BASILISK, DEEP, DEEP_KEY, SEA_KEY, SEAFLOOR } from '../data/abyss';
 import { FIXED, FIXED_CATACOMBS } from '../data/fixed';
 import { CATACOMB_ACCESSORIES } from '../data/accessories';
+import { CRYSTAL, CRYSTAL_KEYS, rollCrystal, rollCursedCrystal } from '../data/crystals';
+import type { CrystalKey } from '../engine/types';
 import { pick, pickWeighted, randInt, seededRng, type SeededRng } from './rng';
 
 export type RoomKind = 'battle' | 'chest' | 'bonfire' | 'boss';
@@ -38,6 +40,8 @@ export interface Dungeon {
   quality: number;
   /** 周回（1周目なら 1。2周目以降は敵が強く、アクセサリが出る） */
   cycle?: number;
+  /** 深海: 潜るたびに変わる値（淵結晶の強さ・マイナスを決める） */
+  salt?: string;
 }
 
 export const ROOM_NAMES: Record<RoomKind, string> = { battle: '敵', chest: '宝箱', bonfire: '篝火', boss: '主' };
@@ -149,7 +153,8 @@ function withCycle(gen: Generator, seed: string, level: number, cycle: number): 
 }
 
 /** 探索を再開するとき（入ったときの地下墓をそのまま作り直す） */
-export function rebuildDungeon(catacombId: string, seed: string, level: number, cycle = 1): Dungeon {
+export function rebuildDungeon(catacombId: string, seed: string, level: number, cycle = 1, salt = ''): Dungeon {
+  if (catacombId === `abyss:${DEEP_KEY}`) return buildDeep(seed, level, salt);
   if (catacombId.startsWith('fixed:')) return buildFixed(catacombId.slice(6), level);
   if (catacombId.startsWith('abyss:')) return buildAbyss(catacombId.slice(6), seed, level);
   const gen = GENERATORS[seedVersion(seed)] ?? GENERATORS[1];
@@ -180,6 +185,7 @@ export function buildAbyss(key: string, seed: string, level: number): Dungeon {
   const basilisk = (ri: number): Room => ({
     kind: 'battle', enemy: buildEnemy(BASILISK, bl, `abyss:${key}:${seed}:${ri}`), hpRatio: ABYSS.basiliskHpRatio,
     souls: ABYSS.basiliskSouls, loot: r() < ABYSS.basiliskDropChance ? pick(r, a.loot) : null,
+    extra: crystalDrop(`abyss:${key}:${seed}:${ri}`, key, CRYSTAL.basiliskDrop),
   });
   const floors: Room[][] = [[
     basilisk(0),
@@ -187,6 +193,7 @@ export function buildAbyss(key: string, seed: string, level: number): Dungeon {
     {
       kind: 'boss', enemy: buildEnemy({ ...a.hunter, name: `${a.hunter.name}（${a.name}）` }, hl, `abyss:${key}:${seed}:2`),
       hpRatio: ABYSS.hunterHpRatio, souls: ABYSS.hunterSouls, loot: pick(r, a.loot),
+      extra: crystalDrop(`abyss:${key}:${seed}:2`, key, 1),
     },
   ]];
   return { catacombId: `abyss:${key}`, name: a.name, rank: '底', seed, level, floors, totalRooms: 3, quality: 0 };
@@ -195,7 +202,8 @@ export function buildAbyss(key: string, seed: string, level: number): Dungeon {
 export { ABYSS_KEYS, SEA_KEY };
 
 /** 底の名前（海底も含む） */
-export const abyssName = (key: string): string | null => (key === SEA_KEY ? SEAFLOOR.name : ABYSSES[key]?.name ?? null);
+export const abyssName = (key: string): string | null =>
+  key === SEA_KEY ? SEAFLOOR.name : key === DEEP_KEY ? DEEP.name : ABYSSES[key]?.name ?? null;
 /** 底の直通のシード */
 export const abyssSeed = (key: string): string | null => (key === SEA_KEY ? SEAFLOOR.seed : ABYSSES[key]?.seed ?? null);
 
@@ -215,6 +223,67 @@ export const pickAbyss = (rand: () => number = Math.random): string => {
   return keys[Math.floor(rand() * keys.length)];
 };
 
+/* ---------------- 深海 ---------------- */
+
+/** 深海の呪われた淵結晶が強めるもの（シードで決まる） */
+export const deepTarget = (seed: string): CrystalKey => pick(seededRng(`deep-target:${normalizeSeed(seed)}`), CRYSTAL_KEYS);
+
+/**
+ * 深海を作る。間取り・敵はシードで決まり、淵結晶の強さとマイナスは salt（潜るたびに変わる）で決まる
+ */
+export function buildDeep(seed: string, level: number, salt: string): Dungeon {
+  const s = normalizeSeed(seed);
+  const r = seededRng(`deep:${s}`);
+  const target = deepTarget(s);
+  const base = abyssBaseLevel(level);
+  const floorCount = randInt(r, DEEP.floorsMin, DEEP.floorsMax);
+  const crystal = (fi: number, ri: number, chance: number): LootDef | null => {
+    const cr = seededRng(`deep-crystal:${s}:${salt}:${fi}:${ri}`);
+    return cr() < chance ? { kind: 'crystal', id: 'crystal', tier: 3, crystal: rollCursedCrystal(cr, target) } : null;
+  };
+  const floors: Room[][] = [];
+  for (let fi = 0; fi < floorCount; fi++) {
+    const last = fi === floorCount - 1;
+    const n = randInt(r, DEEP.roomsMin, DEEP.roomsMax);
+    const bossAt = last ? n - 1 : n - 2;
+    const rooms: Room[] = [];
+    for (let ri = 0; ri < n; ri++) {
+      let kind: RoomKind = ri === bossAt ? 'boss' : ri > bossAt ? 'bonfire' : ri === 0 ? 'battle' : pickWeighted(r, DEEP.roomWeights);
+      if (kind === 'bonfire' && rooms[ri - 1]?.kind === 'bonfire') kind = 'battle';
+      const tag = `deep:${s}:${fi}:${ri}`;
+      if (kind === 'boss') {
+        const fb = pick(r, DEEP.floorBosses);
+        const def = last ? DEEP.boss : { ...fb, name: `${fb.name}（深海${fi + 1}層の主）` };
+        const lv = base + (last ? DEEP.bossBonus : DEEP.floorBossBonus) + fi * DEEP.floorStep;
+        const fal = last && r() < DEEP.falchionChance;
+        rooms.push({
+          kind, enemy: buildEnemy(def, lv, tag), hpRatio: last ? DEEP.bossHpRatio : DEEP.floorBossHpRatio,
+          souls: last ? DEEP.bossSouls : DEEP.floorBossSouls,
+          loot: fal ? { kind: 'item', id: 'sea_falchion', tier: 3 } : null, extra: crystal(fi, ri, 1),
+        });
+      } else if (kind === 'battle') {
+        rooms.push({
+          kind, enemy: buildEnemy(pick(r, DEEP.enemies), base + DEEP.enemyBonus + fi * DEEP.floorStep, tag),
+          hpRatio: DEEP.enemyHpRatio, souls: DEEP.enemySouls, loot: null, extra: crystal(fi, ri, DEEP.enemyCrystalChance),
+        });
+      } else if (kind === 'chest') {
+        rooms.push({ kind, souls: DEEP.chestSouls, loot: null, extra: crystal(fi, ri, 1) });
+      } else {
+        rooms.push({ kind, souls: 0, loot: null });
+      }
+    }
+    floors.push(rooms);
+  }
+  const totalRooms = floors.reduce((a, f) => a + f.length, 0);
+  return { catacombId: `abyss:${DEEP_KEY}`, name: DEEP.name, rank: '底', seed: s, level, floors, totalRooms, quality: 1, salt };
+}
+
+/** 淵結晶を落とすか（別の乱数で決める） */
+function crystalDrop(tag: string, abyssKey: string, chance: number): LootDef | null {
+  const r = seededRng(`crystal:${tag}`);
+  return r() < chance ? { kind: 'crystal', id: 'crystal', tier: 3, crystal: rollCrystal(r, abyssKey) } : null;
+}
+
 /** 海底を作る。間取りと宝は固定、敵のレベルだけ入ったときの自分のレベルに合わせる */
 export function buildSea(seed: string, level: number): Dungeon {
   const floors: Room[][] = SEAFLOOR.floors.map((rooms, fi) => rooms.map((room, ri): Room => {
@@ -222,6 +291,8 @@ export function buildSea(seed: string, level: number): Dungeon {
       return {
         kind: room.kind, enemy: buildEnemy(room.enemy, abyssBaseLevel(level) + room.bonus, `abyss:sea:${fi}:${ri}`),
         hpRatio: room.hpRatio, souls: room.souls, loot: room.loot ?? null,
+        // 淵結晶は追加の落とし物（海底の表そのものは変えない）
+        extra: crystalDrop(`abyss:sea:${seed}:${fi}:${ri}`, SEA_KEY, room.kind === 'boss' ? 1 : CRYSTAL.seaDrop),
       };
     }
     if (room.kind === 'chest') return { kind: 'chest', souls: room.souls ?? 0, loot: room.loot ?? null };

@@ -5,6 +5,7 @@ import {
 import { CARDS } from '../data/cards';
 import { CLASSES, STAT_NAMES, STAT_ORDER } from '../data/classes';
 import { ACCESSORIES, accessoryText } from '../data/accessories';
+import { crystalText } from '../data/crystals';
 import { ARMORS, ARMOR_SLOTS, SHIELDS, WEAPONS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { costLabel, kg, pct, reqLabel, typeName } from '../engine/format';
@@ -139,6 +140,28 @@ function render(): void {
       <p class="eq-detail">${a ? `${a.kind}・${accessoryText(a)}` : '<span class="dim">なし</span>'}</p></div>`;
   }).join('');
 
+  // 淵結晶（底の武器にはめる）
+  const crystals = c.inventory.crystals ?? [];
+  const usedBy = new Map<string, string>();
+  for (const [wid, slots] of Object.entries(c.sockets ?? {})) for (const u of slots) if (u) usedBy.set(u, wid);
+  const sockWeapons = Object.entries(WEAPONS).filter(([id, w]) => w.sockets && own(id));
+  const crystalSec = sockWeapons.length || crystals.length ? `
+    <section class="ed-sec">
+      <div class="ed-h-row"><h2 class="ed-h">淵結晶</h2><span class="lv">${crystals.length}個</span></div>
+      <p class="note">底の武器には淵結晶を3つまではめられます。はめた武器を右手か左手に持っているあいだ効きます。呪われた淵結晶はマイナスもつきます。</p>
+      ${sockWeapons.map(([wid, w]) => {
+        const slots = c.sockets?.[wid] ?? [];
+        const held = c.equip.right === wid || c.equip.left === wid;
+        return `<div class="sock-w"><p class="sock-name"><b>${w.name}</b>${held ? '<span class="pts">装備中</span>' : '<span class="dim">持っていないと効かない</span>'}</p>
+          ${Array.from({ length: w.sockets! }, (_, i) => {
+            const cur = slots[i] ?? null;
+            const list = crystals.filter((x) => x.uid === cur || !usedBy.has(x.uid)).map((x) => [x.uid, `${x.name}：${crystalText(x)}`] as [string, string]);
+            return `<select class="sock ${cur && crystals.find((x) => x.uid === cur)?.minus ? 'cursed' : ''}" data-sock="${wid}:${i}" aria-label="${w.name}の穴${i + 1}">${options(list, cur, `穴${i + 1}：なし`)}</select>`;
+          }).join('')}</div>`;
+      }).join('') || '<p class="note dim">淵結晶をはめられる底の武器を持っていません。</p>'}
+      ${lo.crystals.length ? `<p class="note">効いている淵結晶：${lo.crystals.map((x) => esc(crystalText(x))).join('／')}</p>` : ''}
+    </section>` : '';
+
   const ratio = Math.min(lo.ratio, 1.2);
   const wc = lo.weightClass;
   const weightBox = `<div class="load">
@@ -191,6 +214,7 @@ function render(): void {
       ${ownAccs.length ? accRows : `<p class="note dim">アクセサリ（指輪・タリスマン）は、地下墓の2周目以降で手に入ります。${RULES.accessorySlots}つまで身につけられます。</p>`}
       ${weightBox}
     </section>
+    ${crystalSec}
     <section class="ed-sec">
       <div class="ed-h-row"><h2 class="ed-h">デッキ</h2>
         <span class="lv"><b class="${c.deck.length < RULES.deckMin || c.deck.length > RULES.deckMax ? 'warn' : ''}">${c.deck.length}</b>枚（${RULES.deckMin}〜${RULES.deckMax}・同名${RULES.copyLimit}枚まで）</span></div>
@@ -267,6 +291,18 @@ function onClick(ev: Event): void {
 function onChange(ev: Event): void {
   if (!D) return;
   const t = ev.target as HTMLSelectElement;
+  if (t.dataset.sock) {
+    const [wid, i] = t.dataset.sock.split(':');
+    const n = WEAPONS[wid]?.sockets ?? 0;
+    const sockets = { ...(D.c.sockets ?? {}) };
+    // 同じ淵結晶は1か所にだけ
+    if (t.value) for (const k of Object.keys(sockets)) sockets[k] = sockets[k].map((u) => (u === t.value ? null : u));
+    const slots = Array.from({ length: n }, (_, j) => sockets[wid]?.[j] ?? null);
+    slots[Number(i)] = t.value || null;
+    sockets[wid] = slots;
+    D.c.sockets = sockets;
+    return render();
+  }
   if (t.dataset.acc !== undefined) {
     const list = [...(D.c.accessories ?? [])];
     const i = Number(t.dataset.acc);

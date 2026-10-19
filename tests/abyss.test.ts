@@ -27,11 +27,14 @@ describe('底の構成', () => {
       expect(rebuildDungeon(d.catacombId, 'x', 30)).toEqual(d);
     }
   });
-  it('専用の物は底ごとに3つ（杖・底の魔術・捨てると発動する道具）', () => {
+  it('専用の物は底ごとに4つ（触媒の剣・底の魔術・捨てると発動する道具・2本目の武器）。武器は淵結晶をはめられる', () => {
     for (const a of Object.values(ABYSSES)) {
-      expect(a.loot).toHaveLength(3);
-      const [staff, spell, item] = a.loot;
+      expect(a.loot).toHaveLength(4);
+      const [staff, spell, item, second] = a.loot;
       expect(staff.kind).toBe('item');
+      expect(WEAPONS[staff.id].sockets).toBe(3);
+      expect(WEAPONS[second.id].sockets).toBe(3);
+      expect(WEAPONS[second.id].school).toBe('sorcery');
       expect(CARDS[spell.id].discard).toBeTruthy();
       expect(CARDS[item.id].onDiscard).toBeTruthy();
       expect(CARDS[item.id].unplayable).toBe(true);
