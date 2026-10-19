@@ -131,35 +131,35 @@ export const CARDS: Record<string, CardDef> = {
       b.strike(f, o, { label: '鮮血の渦', dmg: spell(f, 'incant', 8, 1.2) ?? 0, type: 'phys', bleed: scaled(FEAST_BLEED, f.stats) }),
   },
 
-  // ---- 底の魔術（手札を選んで捨てて使う） ----
+  // ---- 底の祈祷（手札を選んで捨てて使う） ----
   quake: {
-    name: '地鳴り', kind: '魔術', role: 'attack', school: 'sorcery', cost: { t: 'sum', n: 3 }, fp: 3, req: { int: 28 },
+    name: '地鳴り', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 3 }, fp: 3, req: { fai: 28 },
     discard: { min: 1, max: 2 },
-    text: (f) => `手札を1〜2枚捨てる。魔力${num(spell(f, 'sorcery', 5, 0.8), '5+杖×0.8')}＋捨てた枚数×6の攻撃。`,
+    text: (f) => `手札を1〜2枚捨てる。魔力${num(spell(f, 'incant', 5, 0.8), '5+聖印×0.8')}＋捨てた枚数×6の攻撃。`,
     run: (b, f, o, ctx) =>
-      b.strike(f, o, { label: '地鳴り', dmg: (spell(f, 'sorcery', 5, 0.8) ?? 0) + ctx.discarded * 6, type: 'magic' }),
+      b.strike(f, o, { label: '地鳴り', dmg: (spell(f, 'incant', 5, 0.8) ?? 0) + ctx.discarded * 6, type: 'magic' }),
   },
   shipwreck: {
-    name: '難破', kind: '魔術', role: 'utility', school: 'sorcery', cost: { t: 'face', f: [2, 4, 6] }, fp: 2, req: { int: 24 },
+    name: '難破', kind: '祈祷', role: 'utility', school: 'incant', cost: { t: 'face', f: [2, 4, 6] }, fp: 2, req: { fai: 24 },
     discard: { min: 1, max: 3 },
-    text: (f) => `手札を1〜3枚捨て、捨てた枚数＋1枚引く。そのあと魔力${num(spell(f, 'sorcery', 4, 0.5), '4+杖×0.5')}の攻撃。`,
+    text: (f) => `手札を1〜3枚捨て、捨てた枚数＋1枚引く。そのあと魔力${num(spell(f, 'incant', 4, 0.5), '4+聖印×0.5')}の攻撃。`,
     run: async (b, f, o, ctx) => {
       const got = Array.from({ length: ctx.discarded + 1 }, () => b.draw(f)).filter(Boolean).length;
       b.log(`カードを${got}枚引いた。`, b.side(f));
-      await b.strike(f, o, { label: '難破', dmg: spell(f, 'sorcery', 4, 0.5) ?? 0, type: 'magic' });
+      await b.strike(f, o, { label: '難破', dmg: spell(f, 'incant', 4, 0.5) ?? 0, type: 'magic' });
     },
   },
   gale: {
-    name: '谷風', kind: '魔術', role: 'attack', school: 'sorcery', cost: { t: 'face', f: [1, 3, 5] }, fp: 3, req: { int: 30 },
+    name: '谷風', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'face', f: [1, 3, 5] }, fp: 3, req: { fai: 30 },
     discard: { min: 1, max: 1 },
-    text: (f) => `手札を1枚捨てる。魔力${num(spell(f, 'sorcery', 8, 1), '8+杖')}の攻撃。ガードできない。`,
-    run: (b, f, o) => b.strike(f, o, { label: '谷風', dmg: spell(f, 'sorcery', 8, 1) ?? 0, type: 'magic', unguardable: true }),
+    text: (f) => `手札を1枚捨てる。魔力${num(spell(f, 'incant', 8, 1), '8+聖印')}の攻撃。ガードできない。`,
+    run: (b, f, o) => b.strike(f, o, { label: '谷風', dmg: spell(f, 'incant', 8, 1) ?? 0, type: 'magic', unguardable: true }),
   },
   tide: {
-    name: '水底の帳', kind: '魔術', role: 'heal', school: 'sorcery', cost: { t: 'sum', n: 4 }, fp: 4, req: { int: 26 },
+    name: '水底の帳', kind: '祈祷', role: 'heal', school: 'incant', cost: { t: 'sum', n: 4 }, fp: 4, req: { fai: 26 },
     discard: { min: 1, max: 2 },
-    text: (f) => `手札を1〜2枚捨てる。HPを（${num(spell(f, 'sorcery', 6, 0.5), '6+杖×0.5')}）×捨てた枚数回復する。`,
-    run: (b, f, _o, ctx) => b.heal(f, (spell(f, 'sorcery', 6, 0.5) ?? 0) * ctx.discarded),
+    text: (f) => `手札を1〜2枚捨てる。HPを（${num(spell(f, 'incant', 6, 0.5), '6+聖印×0.5')}）×捨てた枚数回復する。`,
+    run: (b, f, _o, ctx) => b.heal(f, (spell(f, 'incant', 6, 0.5) ?? 0) * ctx.discarded),
   },
 
   // ---- 底の道具（自分では使えず、捨てられると発動する） ----
@@ -212,11 +212,11 @@ export const CARDS: Record<string, CardDef> = {
 
   // ---- 海底 ----
   searoar: {
-    name: '海鳴り', kind: '魔術', role: 'attack', school: 'sorcery', cost: { t: 'sum', n: 5 }, fp: 5, req: { int: 34 },
+    name: '海鳴り', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 5 }, fp: 5, req: { fai: 34 },
     discard: { min: 1, max: 3 },
-    text: (f) => `手札を1〜3枚捨てる。魔力${num(spell(f, 'sorcery', 4, 0.7), '4+杖×0.7')}＋捨てた枚数×4の攻撃。当たると呪死が捨てた枚数×3溜まる。`,
+    text: (f) => `手札を1〜3枚捨てる。魔力${num(spell(f, 'incant', 4, 0.7), '4+聖印×0.7')}＋捨てた枚数×4の攻撃。当たると呪死が捨てた枚数×3溜まる。`,
     run: (b, f, o, ctx) =>
-      b.strike(f, o, { label: '海鳴り', dmg: (spell(f, 'sorcery', 4, 0.7) ?? 0) + ctx.discarded * 4, type: 'magic', curse: ctx.discarded * 3 }),
+      b.strike(f, o, { label: '海鳴り', dmg: (spell(f, 'incant', 4, 0.7) ?? 0) + ctx.discarded * 4, type: 'magic', curse: ctx.discarded * 3 }),
   },
   pearl: {
     name: '海底の真珠', kind: 'アイテム', role: 'utility', cost: NO_COST, unplayable: true,

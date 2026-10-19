@@ -12,7 +12,7 @@ export interface AbyssDef {
   seed: string;
   blurb: string;
   hunter: EnemyDef;
-  /** 専用の物（触媒の剣・底の魔術・捨てると発動する道具・2本目の武器） */
+  /** 専用の物（触媒の剣・底の祈祷・捨てると発動する道具・2本目の武器） */
   loot: LootDef[];
 }
 
@@ -91,7 +91,7 @@ export interface SeaDef {
   name: string;
   seed: string;
   blurb: string;
-  /** 専用の物（触媒の銛・海底の魔術・捨てると発動する道具） */
+  /** 専用の物（触媒の銛・海底の祈祷・捨てると発動する道具） */
   loot: LootDef[];
   floors: SeaRoom[][];
 }
