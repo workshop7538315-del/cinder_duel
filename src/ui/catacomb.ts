@@ -249,10 +249,21 @@ function renderRun(): void {
 
   $('#runBody').innerHTML = `${head}
     ${notice ? `<p class="notice" role="status">${esc(notice)}</p>` : ''}
+    ${underLevelWarning(dungeon, run, lo.level)}
     ${status}
     ${action}
     <div class="preview">${mapHTML(dungeon, run)}</div>
     ${abandon}`;
+}
+
+/** レベルが足りないまま底に入ったときの、脱出を勧める警告（最初の部屋にいるあいだ出す） */
+function underLevelWarning(d: Dungeon, r: RunState, level: number): string {
+  if (d.rank !== '底' || level >= ABYSS.minBaseLevel || r.floor !== 0 || r.room !== 0) return '';
+  return `<div class="warn abyss-warn" role="alert">
+    <b>この底は、あなたにはまだ早い。</b>
+    <span>底の敵はLv${ABYSS.minBaseLevel}を基準に強くなる（あなたはLv${level}）。勝ち目はほとんどない。
+    今すぐ脱出することを勧める。脱出するとレベルを${ABYSS.escapeLevelLoss}失うが、ここで呪死を重ねればもっと失う。</span>
+    <button type="button" class="btn danger" data-run="abandon">今すぐ脱出する</button></div>`;
 }
 
 /** 呪死でレベルを奪う敵の注意書き */

@@ -289,3 +289,9 @@ button.die{padding:7px}
 .rm.stain i{position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;background:var(--blood);box-shadow:0 0 0 2px var(--panel)}
 .result h3{font-size:34px;letter-spacing:.12em}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ---- 底にレベル不足で入ったときの警告 ---- */
+.abyss-warn{display:flex;flex-direction:column;gap:8px;padding:14px 16px;border:1px solid #a8433b;border-radius:8px;background:rgba(168,67,59,.14);font-weight:400}
+.abyss-warn b{font-size:17px;letter-spacing:.04em}
+.abyss-warn span{color:inherit;line-height:1.6}
+.abyss-warn .btn{align-self:flex-start}
