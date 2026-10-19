@@ -11,7 +11,7 @@ import { Battle, type BattleIO } from '../src/game/battle';
 import { makeFighter } from '../src/game/setup';
 
 describe('底の構成', () => {
-  it('1階層3部屋。バジリスク2体（レベル+5）と盗掘者狩り（レベル+10）', () => {
+  it('1階層3部屋。バジリスク2体（基準+5）と盗掘者狩り（基準+10）。Lv80未満は基準がLv80', () => {
     for (const key of Object.keys(ABYSSES)) {
       const d = buildAbyss(key, 'x', 30);
       expect(d.rank).toBe('底');
@@ -19,8 +19,8 @@ describe('底の構成', () => {
       const [a, b, boss] = d.floors[0];
       expect([a.kind, b.kind, boss.kind]).toEqual(['battle', 'battle', 'boss']);
       expect(a.enemy!.name).toBe('バジリスク');
-      expect(charLevel(a.enemy!)).toBe(30 + ABYSS.basiliskLevelBonus);
-      expect(charLevel(boss.enemy!)).toBe(30 + ABYSS.hunterLevelBonus);
+      expect(charLevel(a.enemy!)).toBe(ABYSS.minBaseLevel + ABYSS.basiliskLevelBonus);
+      expect(charLevel(boss.enemy!)).toBe(ABYSS.minBaseLevel + ABYSS.hunterLevelBonus);
       expect(boss.enemy!.name).toContain('盗掘者狩り');
       // 主は専用の物を必ず落とす
       expect(ABYSSES[key].loot.map((l) => l.id)).toContain(boss.loot!.id);
@@ -36,6 +36,13 @@ describe('底の構成', () => {
       expect(CARDS[item.id].onDiscard).toBeTruthy();
       expect(CARDS[item.id].unplayable).toBe(true);
     }
+  });
+  it('Lv80以上なら、基準は自分のレベル', () => {
+    const d = buildAbyss('earth', 'x', 95);
+    expect(charLevel(d.floors[0][0].enemy!)).toBe(95 + ABYSS.basiliskLevelBonus);
+    expect(charLevel(d.floors[0][2].enemy!)).toBe(95 + ABYSS.hunterLevelBonus);
+    const sea = buildAbyss(SEA_KEY, 'x', 95);
+    expect(charLevel(sea.floors[1][3].enemy!)).toBe(95 + 12);
   });
   it('ソウル稼ぎには向かない', () => {
     const d = buildAbyss('earth', 'x', 30);
@@ -131,7 +138,7 @@ describe('海底', () => {
     expect(a.floors.flat().map((r) => r.loot?.id ?? null)).toEqual(b.floors.flat().map((r) => r.loot?.id ?? null));
     a.floors.forEach((f, fi) => f.forEach((r, ri) => {
       const def = SEAFLOOR.floors[fi][ri];
-      if (def.kind === 'battle' || def.kind === 'boss') expect(charLevel(r.enemy!)).toBe(30 + def.bonus);
+      if (def.kind === 'battle' || def.kind === 'boss') expect(charLevel(r.enemy!)).toBe(ABYSS.minBaseLevel + def.bonus);
     }));
     // 各階層の最後の戦闘は主、最後の主は専用の触媒武器を落とす
     const last = a.floors[a.floors.length - 1];

@@ -5,7 +5,7 @@ import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
 import { ABYSS } from '../data/abyss';
 import { FIXED_CATACOMBS } from '../data/fixed';
 import {
-  abyssFromSeed, abyssName, abyssSeed, ABYSS_KEYS, buildAbyss, fixedFromSeed, SEA_KEY, generateDungeon, normalizeSeed, pickAbyss, rebuildDungeon, ROOM_NAMES, strayInto, versionedSeed,
+  abyssBaseLevel, abyssFromSeed, abyssName, abyssSeed, ABYSS_KEYS, buildAbyss, fixedFromSeed, SEA_KEY, generateDungeon, normalizeSeed, pickAbyss, rebuildDungeon, ROOM_NAMES, strayInto, versionedSeed,
   type Dungeon,
 } from '../dungeon/generate';
 import { randomSeed } from '../dungeon/rng';
@@ -92,7 +92,7 @@ function abyssHTML(c: Character): string {
     ${known.map((k) => {
       const sd = abyssSeed(k)!;
       return `<button type="button" class="hist hard ${normalizeSeed(seed) === sd ? 'on' : ''}" data-hist="${esc(sd)}">
-        <b>${abyssName(k)}</b><span>高難度・${k === SEA_KEY ? '2階層9部屋' : '1階層3部屋'}・敵はあなたのレベルより上</span><code>${esc(sd)}</code></button>`;
+        <b>${abyssName(k)}</b><span>高難度・${k === SEA_KEY ? '2階層9部屋' : '1階層3部屋'}・敵はLv${abyssBaseLevel(charLevel(c))}以上</span><code>${esc(sd)}</code></button>`;
     }).join('')}</div>`;
 }
 
