@@ -5,7 +5,9 @@ import { costLabel, typeName } from '../engine/format';
 import { RULES } from '../data/rules';
 import { scaleLabel } from '../engine/scaling';
 import type { Die, Fighter } from '../engine/types';
-import { Battle, cardUnusable, type BattleIO, type IncomingHit, type LogKind, type Reaction } from '../game/battle';
+import {
+  Battle, cardUnusable, type BattleIO, type IncomingHit, type LogKind, type Reaction, type SpecialAction,
+} from '../game/battle';
 import { makeFighter, scaleHp } from '../game/setup';
 import { $, dieHTML, esc, show } from './dom';
 import { askCount, modal } from './modal';
@@ -169,12 +171,17 @@ const io: BattleIO = {
     return v === 'y';
   },
 
-  askTurnDice(max, suggested) {
-    return askCount({
+  async askTurnDice(max, suggested, special) {
+    const k = await askCount({
       title: 'あなたの手番',
-      text: '振ったダイスは手番終了時に消えます。振らなかった分は相手の攻撃へのリアクション用に残ります。',
+      text: max
+        ? '振ったダイスは手番終了時に消えます。振らなかった分は相手の攻撃へのリアクション用に残ります。'
+        : 'スタミナダイスがありません。',
       max, def: suggested, btn: 'まとめて振る',
+      alt: max ? undefined : '何もせず手番を終える',
+      extra: special ? { label: special.label, note: special.note } : undefined,
     });
+    return k === -2 ? 'special' : Math.max(0, k);
   },
 
   async askReactDice(hit, max) {
@@ -231,6 +238,8 @@ export interface BattleOptions {
   fp?: number | null;
   /** 相手の最大HPの倍率 */
   foeHpRatio?: number;
+  /** 手番の代わりに1回だけ行える特別な行動（血痕の回収など） */
+  special?: SpecialAction;
   /** 降参したときの説明 */
   surrenderNote?: string;
 }
@@ -245,6 +254,7 @@ export function startBattle(player: Character, foe: Character, exit: BattleEnd, 
   if (opts.hp != null) me.hp = Math.min(me.maxHp, Math.max(1, opts.hp));
   if (opts.fp != null) me.fp = Math.min(me.maxFp, Math.max(0, opts.fp));
   B = new Battle(me, scaleHp(makeFighter(foe, false), opts.foeHpRatio), io);
+  B.special = opts.special ?? null;
   show('battle');
   $('#log').innerHTML = '';
   hint('');

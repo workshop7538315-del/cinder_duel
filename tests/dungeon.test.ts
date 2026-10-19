@@ -108,3 +108,72 @@ describe('探索の進み方', () => {
     expect(character.souls).toBe(3 * DUNGEON.dupeSouls);
   });
 });
+
+import { abandon, isLooted, retrieveStain, stainHere } from '../src/dungeon/run';
+
+describe('血痕（倒れたときのソウル）', () => {
+  const d = buildCatacomb('knight', 'stain', 30);
+  /** 最初の戦闘に勝ってソウルを持った状態で、次の戦闘部屋まで進める */
+  function toSecondBattle() {
+    let run = startRun('c1', d);
+    run = winBattle(d, run, 50, 5);
+    while (currentRoom(d, run)!.kind !== 'battle' && currentRoom(d, run)!.kind !== 'boss') {
+      run = currentRoom(d, run)!.kind === 'chest' ? openChest(d, run) : leaveBonfire(d, run);
+    }
+    return run;
+  }
+
+  it('倒れるとソウルをその部屋に落とし、最初の部屋からやり直す。拾った物は残る', () => {
+    const run = toSecondBattle();
+    expect(run.souls).toBeGreaterThan(0);
+    const dead = loseBattle(run);
+    expect(dead.status).toBe('active');
+    expect(dead.souls).toBe(0);
+    expect([dead.floor, dead.room]).toEqual([0, 0]);
+    expect(dead.stain).toEqual({ floor: run.floor, room: run.room, souls: run.souls });
+    expect(dead.loot).toEqual(run.loot);
+    expect(dead.hp).toBeNull();
+  });
+  it('倒れた部屋で回収すれば取り戻せる', () => {
+    const run = toSecondBattle();
+    let r = loseBattle(run);
+    r = winBattle(d, r, 50, 5); // 1部屋目をやり直し
+    while (!stainHere(r)) r = currentRoom(d, r)!.kind === 'chest' ? openChest(d, r) : currentRoom(d, r)!.kind === 'bonfire' ? leaveBonfire(d, r) : winBattle(d, r, 50, 5);
+    const before = r.souls;
+    r = retrieveStain(r);
+    expect(r.souls).toBe(before + run.souls);
+    expect(r.stain).toBeNull();
+  });
+  it('回収しないまま勝つと失われる。もう一度倒れても失われる', () => {
+    const run = toSecondBattle();
+    const dead = loseBattle(run);
+    // もう一度倒れる（1部屋目で）
+    const dead2 = loseBattle(dead);
+    expect(dead2.stain).toBeNull(); // ソウル0で倒れたので新しい血痕もない
+    // 回収せずに勝つ
+    let r = dead;
+    while (!stainHere(r)) r = currentRoom(d, r)!.kind === 'chest' ? openChest(d, r) : currentRoom(d, r)!.kind === 'bonfire' ? leaveBonfire(d, r) : winBattle(d, r, 50, 5);
+    const won = winBattle(d, r, 50, 5);
+    expect(won.stain).toBeNull();
+  });
+  it('宝箱と落とし物は一度きり。敵のソウルはやり直すたびに得られる', () => {
+    const cd = buildCatacomb('knight', 'chest-a', 30);
+    let run = startRun('c1', cd);
+    let guard = 0;
+    while (currentRoom(cd, run)!.kind !== 'chest' && guard++ < 20) {
+      const k = currentRoom(cd, run)!.kind;
+      if (k === 'boss') return; // 宝箱のない地下墓
+      run = k === 'bonfire' ? leaveBonfire(cd, run) : winBattle(cd, run, 50, 5);
+    }
+    const opened = openChest(cd, run);
+    const again = openChest(cd, { ...opened, floor: run.floor, room: run.room });
+    expect(isLooted({ ...opened, floor: run.floor, room: run.room })).toBe(true);
+    expect(again.loot).toEqual(opened.loot);
+    expect(again.souls).toBe(opened.souls);
+  });
+  it('諦めると何も持ち帰れない', () => {
+    const c = newCharacter('vagabond');
+    const run = toSecondBattle();
+    expect(bankRun(c, abandon(run)).character).toBe(c);
+  });
+});

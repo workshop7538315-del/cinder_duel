@@ -42,14 +42,22 @@ export interface BattleIO {
   flash(f: Fighter): void;
   wait(ms: number): Promise<void>;
   askDraw(): Promise<boolean>;
-  /** 手番開始時に振る個数 */
-  askTurnDice(max: number, suggested: number): Promise<number>;
+  /** 手番開始時に振る個数。special を渡したときは、それを選ぶと 'special' が返る */
+  askTurnDice(max: number, suggested: number, special?: SpecialAction): Promise<number | 'special'>;
   /** リアクションで振る個数（0 = 振らずに受ける。max が 0 なら受けるしかない） */
   askReactDice(hit: IncomingHit, max: number): Promise<number>;
   askReactChoice(hit: IncomingHit, dice: Die[], canDodge: boolean, canGuard: boolean, canArt: boolean): Promise<Reaction>;
   /** 反撃の好機に振る個数（0 = 見送る） */
   askCounter(info: CounterInfo, max: number): Promise<number>;
   finished(playerWon: boolean): void;
+}
+
+/** 手番を丸ごと使って行う特別な行動（地下墓で落としたソウルの回収など） */
+export interface SpecialAction {
+  label: string;
+  note: string;
+  /** 行ったときのログ */
+  use: () => string;
 }
 
 /** カードが今使えない理由（使えるなら null） */
@@ -71,6 +79,8 @@ export class Battle {
   private endTurnResolve: (() => void) | null = null;
   /** 反撃の構え（相手が次に攻撃以外をしたら反撃できる） */
   counter: CounterInfo | null = null;
+  /** プレイヤーが手番の代わりに1回だけ行える特別な行動 */
+  special: SpecialAction | null = null;
 
   constructor(
     readonly p: Fighter,
@@ -179,8 +189,18 @@ export class Battle {
   private async playerTurn(): Promise<void> {
     const p = this.p;
     let k = 0;
-    if (p.stamina > 0) k = await this.io.askTurnDice(p.stamina, p.stamina >= 3 ? p.stamina - 1 : p.stamina);
-    else this.log('スタミナダイスがない。');
+    if (p.stamina > 0 || this.special) {
+      const r = await this.io.askTurnDice(p.stamina, p.stamina >= 3 ? p.stamina - 1 : p.stamina, this.special ?? undefined);
+      if (r === 'special' && this.special) {
+        // 手番を丸ごと使う。ダイスは振らず、そのまま手番を終える
+        const sp = this.special;
+        this.special = null;
+        this.log(sp.use(), 'me');
+        this.update();
+        return;
+      }
+      k = r === 'special' ? 0 : r;
+    } else this.log('スタミナダイスがない。');
     this.rollAction(p, Math.max(0, k));
     this.phase = 'act';
     this.update();

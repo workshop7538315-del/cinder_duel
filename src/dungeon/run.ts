@@ -2,9 +2,17 @@ import type { Character } from '../character/model';
 import { DUNGEON, type LootDef } from '../data/catacombs';
 import type { Dungeon, Room } from './generate';
 
-export type RunStatus = 'active' | 'dead' | 'cleared' | 'retreated';
+export type RunStatus = 'active' | 'cleared' | 'retreated' | 'abandoned';
 
-/** 地下墓の探索中の状態。手に入れたものは、踏破するか篝火から退却するまで持ち帰れない */
+/** 倒れた部屋に落としたソウル（血痕） */
+export interface Bloodstain {
+  floor: number;
+  room: number;
+  souls: number;
+}
+
+/** 地下墓の探索中の状態。手に入れたものは、踏破するか篝火から退却するまで持ち帰れない。
+ *  倒れると最初の部屋からやり直しになり、持っていたソウルは倒れた部屋に落ちる */
 export interface RunState {
   charId: string;
   catacombId: string;
@@ -19,12 +27,18 @@ export interface RunState {
   souls: number;
   loot: LootDef[];
   status: RunStatus;
+  /** 落としたソウル（なければ null） */
+  stain?: Bloodstain | null;
+  /** 宝箱を開けた・落とし物を拾った部屋（"階層:部屋"）。やり直しても二度は手に入らない */
+  looted?: string[];
+  /** 倒れた回数 */
+  deaths?: number;
 }
 
 export function startRun(charId: string, d: Dungeon): RunState {
   return {
     charId, catacombId: d.catacombId, seed: d.seed, level: d.level,
-    floor: 0, room: 0, hp: null, fp: null, souls: 0, loot: [], status: 'active',
+    floor: 0, room: 0, hp: null, fp: null, souls: 0, loot: [], status: 'active', stain: null, looted: [], deaths: 0,
   };
 }
 
@@ -42,24 +56,57 @@ function advance(d: Dungeon, run: RunState): RunState {
   return { ...run, floor: run.floor + 1, room: 0 };
 }
 
-const gain = (run: RunState, room: Room): RunState => ({
-  ...run, souls: run.souls + room.souls, loot: room.loot ? [...run.loot, room.loot] : run.loot,
-});
+const roomKey = (run: RunState) => `${run.floor}:${run.room}`;
+export const isLooted = (run: RunState): boolean => (run.looted ?? []).includes(roomKey(run));
 
+/** 部屋の中身を得る。ソウルは毎回、物は一度きり（やり直しても二度は手に入らない） */
+function gain(run: RunState, room: Room, souls: boolean): RunState {
+  const first = !isLooted(run);
+  return {
+    ...run,
+    souls: run.souls + (souls ? room.souls : 0),
+    loot: room.loot && first ? [...run.loot, room.loot] : run.loot,
+    looted: first && (room.loot || room.kind === 'chest') ? [...(run.looted ?? []), roomKey(run)] : run.looted ?? [],
+  };
+}
+
+/** 今の部屋に自分の血痕があるか */
+export const stainHere = (run: RunState): Bloodstain | null =>
+  run.stain && run.stain.floor === run.floor && run.stain.room === run.room ? run.stain : null;
+
+/** 宝箱を開ける。一度開けた宝箱は空 */
 export function openChest(d: Dungeon, run: RunState): RunState {
-  return advance(d, gain(run, currentRoom(d, run)!));
+  const room = currentRoom(d, run)!;
+  return advance(d, isLooted(run) ? run : gain(run, room, true));
+}
+
+/** 落としたソウルを拾う（戦闘中に手番を使ったとき） */
+export function retrieveStain(run: RunState): RunState {
+  const s = stainHere(run);
+  return s ? { ...run, souls: run.souls + s.souls, stain: null } : run;
 }
 
 export function winBattle(d: Dungeon, run: RunState, hp: number, fp: number): RunState {
   const room = currentRoom(d, run)!;
-  const next = { ...gain(run, room), hp, fp };
+  // 血痕のある部屋で回収しないまま勝つと、そのソウルは失われる
+  const next = { ...gain(run, room, true), hp, fp, stain: stainHere(run) ? null : run.stain ?? null };
   if (room.kind === 'boss') {
     return { ...next, souls: next.souls + d.totalRooms * DUNGEON.clearBonusPerRoom, status: 'cleared' };
   }
   return advance(d, next);
 }
 
-export const loseBattle = (run: RunState): RunState => ({ ...run, status: 'dead' });
+/** 倒れた。持っていたソウルはこの部屋に落ち（前の血痕は消える）、最初の部屋からやり直す */
+export function loseBattle(run: RunState): RunState {
+  return {
+    ...run,
+    stain: run.souls > 0 ? { floor: run.floor, room: run.room, souls: run.souls } : null,
+    souls: 0, floor: 0, room: 0, hp: null, fp: null, deaths: (run.deaths ?? 0) + 1,
+  };
+}
+
+/** 探索を諦める。この探索で得たものはすべて失う */
+export const abandon = (run: RunState): RunState => ({ ...run, status: 'abandoned' });
 
 /** 篝火で休む（HP・FPが最大に戻る） */
 export const rest = (run: RunState): RunState => ({ ...run, hp: null, fp: null });

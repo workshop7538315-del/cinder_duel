@@ -21,7 +21,7 @@ function idleIO(get: () => Battle): BattleIO {
       if (b?.canAct()) queueMicrotask(() => b.endTurn());
     },
     askDraw: async () => false,
-    askTurnDice: async () => 0,
+    askTurnDice: async () => 0 as number | 'special',
     askReactDice: async () => 0,
     askReactChoice: async (_h, _d, dodge, guard) => (dodge ? 'dodge' : guard ? 'guard' : 'take'),
     askCounter: async () => 0,
