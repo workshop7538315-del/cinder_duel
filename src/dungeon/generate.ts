@@ -1,5 +1,6 @@
 import { autoAlloc, autoDeck, inventoryOf, loadout, type Character } from '../character/model';
 import { CATACOMB_ORDER, CATACOMBS, DUNGEON, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
+import { FIXED, FIXED_CATACOMBS } from '../data/fixed';
 import { pick, pickWeighted, randInt, seededRng, type SeededRng } from './rng';
 
 export type RoomKind = 'battle' | 'chest' | 'bonfire' | 'boss';
@@ -14,10 +15,16 @@ export interface Room {
   souls: number;
   /** 倒したとき・宝箱で得るもの */
   loot: LootDef | null;
+  /** 手がかり（困難な地下墓のID）。見つけた時点で覚える */
+  clue?: string;
 }
 
 export interface Dungeon {
+  /** 通常の地下墓は CATACOMBS のキー、困難な地下墓は "fixed:キー" */
   catacombId: string;
+  name: string;
+  /** 困難な地下墓なら '困難' */
+  rank: '通常' | '困難';
   seed: string;
   /** 生成したときの自分のレベル（敵の強さの基準） */
   level: number;
@@ -57,18 +64,92 @@ const enemySouls = (level: number) => DUNGEON.soulsBase + level * DUNGEON.soulsP
 /** シードの表記ゆれをなくす（前後の空白を除き、小文字にする） */
 export const normalizeSeed = (seed: string): string => seed.trim().toLowerCase().slice(0, 24);
 
-/** シードでどの地下墓かが決まる */
-export function catacombFromSeed(seed: string): string {
+/* ---------------- シードの版（シーズン） ----------------
+ * シードの頭の「数字-」が生成の版。例: 1-k3d9xq2m
+ * 生成のしかた（間取りの決め方・乱数の使い方・宝の表）を変えるときは、
+ * 今の版を残したまま新しい版を足し、新しいシードだけ新しい版で作る。
+ * こうすると、古いシードはずっと同じ地下墓のまま遊べる。
+ * 数字のないシード（v0.7〜0.9で作ったもの）は第1版として扱う。
+ */
+export const CURRENT_SEED_VERSION = 1;
+
+type Generator = (seed: string, level: number) => Dungeon;
+
+const GENERATORS: Record<number, Generator> = {
+  1: (seed, level) => buildCatacomb(catacombFromSeedV1(seed), seed, level),
+};
+
+export function seedVersion(seed: string): number {
+  const m = /^(\d+)-/.exec(normalizeSeed(seed));
+  return m ? Number(m[1]) : 1;
+}
+
+/** 困難な地下墓のシードなら、そのキー */
+export function fixedFromSeed(seed: string): string | null {
+  const s = normalizeSeed(seed);
+  return Object.entries(FIXED_CATACOMBS).find(([, f]) => f.seed === s)?.[0] ?? null;
+}
+
+/** 第1版: シードでどの地下墓かが決まる */
+function catacombFromSeedV1(seed: string): string {
   return pick(seededRng(`catacomb:${normalizeSeed(seed)}`), CATACOMB_ORDER);
 }
+/** 今の版で、そのシードがどの地下墓になるか */
+export const catacombFromSeed = (seed: string): string =>
+  fixedFromSeed(seed) ? `fixed:${fixedFromSeed(seed)}` : catacombFromSeedV1(seed);
 
 /** シードから地下墓を作る。同じシード・レベルなら必ず同じ地下墓・同じ中身になる */
 export function generateDungeon(seed: string, level: number): Dungeon {
   const s = normalizeSeed(seed);
-  return buildCatacomb(catacombFromSeed(s), s, level);
+  const fixed = fixedFromSeed(s);
+  if (fixed) return buildFixed(fixed);
+  const gen = GENERATORS[seedVersion(s)];
+  if (!gen) throw new Error('このシードは新しいバージョンのものです。ページを再読み込みしてください。');
+  return gen(s, level);
 }
 
-/** 地下墓を指定して作る（再開やテスト用） */
+/** 探索を再開するとき（入ったときの地下墓をそのまま作り直す） */
+export function rebuildDungeon(catacombId: string, seed: string, level: number): Dungeon {
+  if (catacombId.startsWith('fixed:')) return buildFixed(catacombId.slice(6));
+  const gen = GENERATORS[seedVersion(seed)] ?? GENERATORS[1];
+  const d = gen(seed, level);
+  return d.catacombId === catacombId ? d : buildCatacomb(catacombId, seed, level);
+}
+
+/** 用意されたシードのまま入ったとき、困難な地下墓に迷い込むか（迷い込むならそのシード） */
+export function strayInto(rand: () => number = Math.random): string | null {
+  if (rand() >= FIXED.strayChance) return null;
+  const list = Object.values(FIXED_CATACOMBS);
+  return list[Math.floor(rand() * list.length)].seed;
+}
+
+/** 新しく作るシード（今の版の印つき） */
+export const versionedSeed = (body: string): string => `${CURRENT_SEED_VERSION}-${body}`;
+
+/* ---------------- 困難な地下墓 ---------------- */
+
+export function buildFixed(key: string): Dungeon {
+  const f = FIXED_CATACOMBS[key];
+  const floors: Room[][] = f.floors.map((rooms, fi) => rooms.map((room, ri): Room => {
+    if (room.kind === 'battle' || room.kind === 'boss') {
+      return {
+        kind: room.kind, enemy: buildEnemy(room.enemy, room.level, `fixed:${key}:${fi}:${ri}`),
+        hpRatio: room.hpRatio ?? 1, souls: room.souls, loot: room.loot ?? null,
+      };
+    }
+    if (room.kind === 'chest') return { kind: 'chest', souls: room.souls ?? 0, loot: room.loot ?? null };
+    return { kind: 'bonfire', souls: 0, loot: null };
+  }));
+  const totalRooms = floors.reduce((a, r) => a + r.length, 0);
+  return {
+    catacombId: `fixed:${key}`, name: f.name, rank: f.rank, seed: f.seed, level: f.recommendedLevel,
+    floors, totalRooms, quality: 1,
+  };
+}
+
+/* ---------------- 第1版の生成 ---------------- */
+
+/** 地下墓を指定して作る（第1版。再開やテスト用） */
 export function buildCatacomb(catacombId: string, seed: string, level: number): Dungeon {
   const cat = CATACOMBS[catacombId];
   const r = seededRng(`${catacombId}:${seed}`);
@@ -122,5 +203,13 @@ export function buildCatacomb(catacombId: string, seed: string, level: number): 
     return rooms;
   });
 
-  return { catacombId, seed, level, floors, totalRooms, quality };
+  // 手がかりは別の乱数で決める（第1版の間取りや宝に影響しないように）
+  floors.forEach((rooms, fi) => rooms.forEach((room, ri) => {
+    const chance = room.kind === 'chest' ? FIXED.clueChestChance : room.kind === 'boss' ? FIXED.clueBossChance : 0;
+    if (!chance) return;
+    const cr = seededRng(`clue:${catacombId}:${seed}:${fi}:${ri}`);
+    if (cr() < chance) room.clue = pick(cr, Object.keys(FIXED_CATACOMBS));
+  }));
+
+  return { catacombId, name: cat.name, rank: '通常', seed, level, floors, totalRooms, quality };
 }

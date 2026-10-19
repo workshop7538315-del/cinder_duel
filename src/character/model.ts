@@ -30,6 +30,8 @@ export interface Character {
   inventory: Inventory;
   /** 持っているソウル */
   souls: number;
+  /** 知っている困難な地下墓（FIXED_CATACOMBS のキー）。手がかりで覚える */
+  clues?: string[];
   createdAt: number;
   updatedAt: number;
 }
@@ -178,7 +180,7 @@ export function newCharacter(classId: string, name?: string): Character {
   return {
     id: newId(), name: name ?? cls.name, classId,
     alloc: zeroStats(), equip: { ...cls.equip }, deck: deckFromCounts(inventory.cards),
-    inventory, souls: 0, createdAt: now, updatedAt: now,
+    inventory, souls: 0, clues: [], createdAt: now, updatedAt: now,
   };
 }
 

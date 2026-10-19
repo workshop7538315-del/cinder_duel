@@ -2,7 +2,10 @@ import { charLevel, checkCharacter, loadout, type Character } from '../character
 import { CARDS } from '../data/cards';
 import { CATACOMBS, type LootDef } from '../data/catacombs';
 import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
-import { buildCatacomb, generateDungeon, normalizeSeed, ROOM_NAMES, type Dungeon } from '../dungeon/generate';
+import { FIXED_CATACOMBS } from '../data/fixed';
+import {
+  generateDungeon, normalizeSeed, rebuildDungeon, ROOM_NAMES, strayInto, versionedSeed, type Dungeon,
+} from '../dungeon/generate';
 import { randomSeed } from '../dungeon/rng';
 import {
   abandon, bankRun, currentRoom, isLooted, leaveBonfire, loseBattle, openChest, rest, retreat, retrieveStain, roomNumber,
@@ -15,7 +18,9 @@ import { $, esc, show } from './dom';
 import { findCharacter, upsertCharacter } from './state';
 
 let charId: string | null = null;
-let seed = randomSeed();
+let seed = versionedSeed(randomSeed());
+/** 用意されたシードのまま（手で変えていない）か。そのまま入ると、まれに困難な地下墓に迷い込む */
+let seedAuto = true;
 let onBack: () => void = () => {};
 
 let dungeon: Dungeon | null = null;
@@ -40,7 +45,8 @@ export function openCatacombs(id: string, back: () => void): void {
   const saved = loadRun(id);
   if (saved) return resumeRun(saved);
   // どの地下墓に入るかはシードで決まる。毎回ちがうシードを用意しておく
-  seed = randomSeed();
+  seed = versionedSeed(randomSeed());
+  seedAuto = true;
   show('dungeon');
   renderSelect();
 }
@@ -63,9 +69,26 @@ function renderSelect(): void {
     </div>
     ${history.length ? `<div class="seed-hist"><p class="eyebrow">行ったことのあるシード</p>
       ${history.map((h) => `<button type="button" class="hist ${h.seed === cur ? 'on' : ''}" data-hist="${esc(h.seed)}">
-        <b>${CATACOMBS[h.catacombId]?.name ?? '？'}</b><span>${h.rooms}部屋・報酬 ${stars(roomsQuality(h.rooms))}</span><code>${esc(h.seed)}</code></button>`).join('')}</div>` : ''}
+        <b>${dungeonName(h.catacombId)}</b><span>${h.catacombId.startsWith('fixed:') ? '困難・' : ''}${h.rooms}部屋・報酬 ${h.catacombId.startsWith('fixed:') ? '★★★' : stars(roomsQuality(h.rooms))}</span><code>${esc(h.seed)}</code></button>`).join('')}</div>` : ''}
+    ${clueHTML(c)}
     ${bad ? '<p class="warn">キャラクターに直すところがあります。編集してから挑んでください。</p>' : ''}
     <button type="button" class="btn primary big" id="dgGo" ${bad ? 'disabled' : ''}>入る</button>`;
+}
+
+/** 地下墓の名前（困難な地下墓も含む） */
+export const dungeonName = (id: string): string =>
+  id.startsWith('fixed:') ? FIXED_CATACOMBS[id.slice(6)]?.name ?? '？' : CATACOMBS[id]?.name ?? '？';
+
+/** 手がかりで知っている困難な地下墓 */
+function clueHTML(c: Character): string {
+  const known = (c.clues ?? []).filter((k) => FIXED_CATACOMBS[k]);
+  if (!known.length) return '';
+  return `<div class="seed-hist"><p class="eyebrow">手がかり（困難な地下墓）</p>
+    ${known.map((k) => {
+      const f = FIXED_CATACOMBS[k];
+      return `<button type="button" class="hist hard ${normalizeSeed(seed) === f.seed ? 'on' : ''}" data-hist="${esc(f.seed)}">
+        <b>${f.name}</b><span>困難・推奨Lv${f.recommendedLevel}・${f.blurb}</span><code>${esc(f.seed)}</code></button>`;
+    }).join('')}</div>`;
 }
 
 /** 部屋数から報酬の目安（generate と同じ式） */
@@ -84,11 +107,20 @@ function mapHTML(d: Dungeon, r: RunState | null): string {
 function enter(): void {
   const c = charId ? findCharacter(charId) : undefined;
   if (!c || checkCharacter(c).errors.length) return;
-  const s = normalizeSeed(seed) || randomSeed();
-  dungeon = generateDungeon(s, charLevel(c));
+  let s = normalizeSeed(seed) || versionedSeed(randomSeed());
+  // 用意されたシードのまま入ると、まれに困難な地下墓に迷い込む
+  const stray = seedAuto ? strayInto() : null;
+  if (stray) s = stray;
+  try {
+    dungeon = generateDungeon(s, charLevel(c));
+  } catch (e) {
+    $('#dgBody').insertAdjacentHTML('afterbegin', `<p class="warn">${esc(e instanceof Error ? e.message : 'このシードでは入れません。')}</p>`);
+    return;
+  }
   run = startRun(c.id, dungeon);
   rememberSeed({ seed: s, catacombId: dungeon.catacombId, rooms: dungeon.totalRooms, at: Date.now() });
-  notice = `${CATACOMBS[dungeon.catacombId].name}に入った。${dungeon.floors.length}階層・全${dungeon.totalRooms}部屋。`;
+  if (dungeon.rank === '困難') learnClue(c, dungeon.catacombId.slice(6));
+  notice = `${stray ? '道に迷い、' : ''}${dungeon.name}に入った。${dungeon.rank === '困難' ? '【困難】' : ''}${dungeon.floors.length}階層・全${dungeon.totalRooms}部屋。`;
   result = null;
   saveRun(run);
   show('run');
@@ -97,7 +129,7 @@ function enter(): void {
 
 function resumeRun(saved: RunState): void {
   run = saved;
-  dungeon = buildCatacomb(saved.catacombId, saved.seed, saved.level);
+  dungeon = rebuildDungeon(saved.catacombId, saved.seed, saved.level);
   result = null;
   notice = '探索の途中から再開しました。';
   show('run');
@@ -113,18 +145,17 @@ function bar(cls: string, v: number, m: number): string {
 function renderRun(): void {
   const c = charId ? findCharacter(charId) : undefined;
   if (!c || !dungeon || !run) return onBack();
-  const cat = CATACOMBS[dungeon.catacombId];
   const lo = loadout(c);
   const maxHp = lo.derived.maxHp;
   const maxFp = lo.derived.maxFp;
   const hp = run.hp ?? maxHp;
   const fp = run.fp ?? maxFp;
 
-  const head = `<div class="run-h"><div><p class="eyebrow">シード ${esc(dungeon.seed)}</p><h1 class="page-h">${cat.name}</h1></div>
+  const head = `<div class="run-h"><div><p class="eyebrow">シード ${esc(dungeon.seed)}</p><h1 class="page-h">${dungeon.name}${dungeon.rank === '困難' ? ' <span class="rank">困難</span>' : ''}</h1></div>
     <span class="lv">${Math.min(roomNumber(dungeon, run), dungeon.totalRooms)} / ${dungeon.totalRooms}部屋</span></div>`;
 
   if (result) {
-    $('#runBody').innerHTML = head + resultHTML(result);
+    $('#runBody').innerHTML = head + (notice ? `<p class="notice" role="status">${esc(notice)}</p>` : '') + resultHTML(result);
     return;
   }
 
@@ -206,7 +237,8 @@ function finish(next: RunState): void {
 
 function step(next: RunState, msg = ''): void {
   run = next;
-  notice = msg;
+  notice = [msg, clueNotice].filter(Boolean).join(' ');
+  clueNotice = '';
   confirmAbandon = false;
   if (next.status !== 'active') return finish(next);
   saveRun(next);
@@ -224,6 +256,7 @@ function fight(): void {
   const firstLoot = room.loot && !isLooted(r);
   startBattle(c, room.enemy!, (won, me) => {
     if (won) {
+      if (room.clue) foundClue(room.clue);
       const gotLoot = firstLoot ? `「${lootName(room.loot!)}」を拾った。` : '';
       const gotStain = stainHere(r) ? `血痕のソウル ${stainHere(r)!.souls} を取り戻した。` : '';
       step(winBattle(d, r, me.hp, me.fp), `${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}${gotStain}`);
@@ -247,6 +280,21 @@ function fight(): void {
   });
 }
 
+/** 手がかりを覚える（物と違って、倒れても諦めても忘れない） */
+function learnClue(c: Character, key: string): boolean {
+  if ((c.clues ?? []).includes(key)) return false;
+  upsertCharacter({ ...c, clues: [...(c.clues ?? []), key], updatedAt: Date.now() });
+  return true;
+}
+
+function foundClue(key: string): void {
+  const c = charId ? findCharacter(charId) : undefined;
+  if (!c || !learnClue(c, key)) return;
+  const f = FIXED_CATACOMBS[key];
+  clueNotice = `手がかりを見つけた：「${f.name}」へ続くシード「${f.seed}」。地下墓の入口の「手がかり」から入れる。`;
+}
+let clueNotice = '';
+
 /* ---------------- 操作 ---------------- */
 
 export function bindCatacombs(): void {
@@ -255,10 +303,12 @@ export function bindCatacombs(): void {
     const h = t.closest<HTMLElement>('[data-hist]');
     if (h) {
       seed = h.dataset.hist!;
+      seedAuto = false;
       return renderSelect();
     }
     if (t.closest('[data-seed]')) {
-      seed = randomSeed();
+      seed = versionedSeed(randomSeed());
+      seedAuto = true;
       return renderSelect();
     }
     if (t.closest('#dgGo')) enter();
@@ -267,6 +317,7 @@ export function bindCatacombs(): void {
     const t = ev.target as HTMLInputElement;
     if (t.id === 'dgSeed') {
       seed = t.value.slice(0, 24);
+      seedAuto = false;
       renderSelect();
     }
   });
@@ -280,6 +331,7 @@ export function bindCatacombs(): void {
       case 'fight':
         return fight();
       case 'open':
+        if (room?.clue && !isLooted(run)) foundClue(room.clue);
         return step(openChest(dungeon, run),
           isLooted(run) ? '' : room?.loot ? `宝箱から「${lootName(room.loot)}」を見つけた。` : `宝箱にはソウルが残っていた。ソウル +${room?.souls ?? 0}。`);
       case 'rest':

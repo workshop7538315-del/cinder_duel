@@ -26,6 +26,7 @@ npm run build    # dist/ に書き出し
 | `src/data/cards.ts` | カード |
 | `src/data/presets.ts` | 練習試合の相手（通常・強敵） |
 | `src/data/catacombs.ts` | 地下墓（敵・主・手に入るもの）と地下墓の数値 |
+| `src/data/fixed.ts` | 困難な地下墓（固定の間取り・特定のシード） |
 | `src/engine/` | 画面に依存しないルール処理（ダイス、コストの支払い、補正、ガード） |
 | `src/character/model.ts` | キャラクターのデータと検査（レベル、装備、デッキ） |
 | `src/character/storage.ts` | 保存・書き出し・読み込み（バージョン管理つき） |
@@ -36,7 +37,7 @@ npm run build    # dist/ に書き出し
 | `src/game/matchmaking.ts` | 練習試合の相手の選び方 |
 | `src/dungeon/` | 地下墓の生成（シードつき乱数）と探索の進み方 |
 | `src/ui/` | 画面（一覧・キャラクリ・地下墓・練習試合・戦闘） |
-| `tests/` | テスト（Vitest） |
+| `tests/` | テスト（Vitest）。`tests/fixtures/seeds-v1.json` は第1版のシードの中身の記録 |
 
 武器・防具・カード・プリセットを足すときは `src/data/` だけを触ればよいようにしてある。
 保存データの形式を変えるときは `src/character/storage.ts` の `SAVE_VERSION` を上げ、`migrate` に変換を足す。
