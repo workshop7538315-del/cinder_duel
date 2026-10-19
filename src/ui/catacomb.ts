@@ -5,7 +5,8 @@ import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
 import { buildCatacomb, generateDungeon, normalizeSeed, ROOM_NAMES, type Dungeon } from '../dungeon/generate';
 import { randomSeed } from '../dungeon/rng';
 import {
-  bankRun, currentRoom, leaveBonfire, loseBattle, openChest, rest, retreat, roomNumber, startRun, winBattle,
+  abandon, bankRun, currentRoom, isLooted, leaveBonfire, loseBattle, openChest, rest, retreat, retrieveStain, roomNumber,
+  stainHere, startRun, winBattle,
   type Banked, type RunState,
 } from '../dungeon/run';
 import { clearRun, loadRun, loadSeedHistory, rememberSeed, saveRun } from '../dungeon/save';
@@ -75,7 +76,8 @@ function mapHTML(d: Dungeon, r: RunState | null): string {
     <li><span class="fl">地下${fi + 1}層</span><ol class="rooms">${f.map((room, ri) => {
       const here = r && r.floor === fi && r.room === ri;
       const done = r && (fi < r.floor || (fi === r.floor && ri < r.room));
-      return `<li class="rm rm-${room.kind} ${here ? 'here' : ''} ${done ? 'done' : ''}">${ROOM_NAMES[room.kind]}</li>`;
+      const stain = r?.stain && r.stain.floor === fi && r.stain.room === ri;
+      return `<li class="rm rm-${room.kind} ${here ? 'here' : ''} ${done ? 'done' : ''} ${stain ? 'stain' : ''}"${stain ? ` title="血痕（ソウル ${r!.stain!.souls}）"` : ''}>${ROOM_NAMES[room.kind]}${stain ? '<i aria-label="血痕"></i>' : ''}</li>`;
     }).join('')}</ol></li>`).join('')}</ol>`;
 }
 
@@ -139,9 +141,13 @@ function renderRun(): void {
     const e = room.enemy!;
     action = `<div class="room-card rk-${room.kind}"><p class="eyebrow">${room.kind === 'boss' ? 'この地下墓の主' : '敵'}</p>
       <b>${esc(e.name)}</b><span>Lv${charLevel(e)}・${[loadout(e).right.name, loadout(e).left?.name].filter(Boolean).join('＋')}</span>
+      ${stainHere(run) ? `<p class="stain-note">ここにあなたの血痕がある（ソウル ${stainHere(run)!.souls}）。戦闘中、手番の初めに「ソウルを回収する」を選ぶと、その手番を使って取り戻せる。回収しないまま勝つか、もう一度倒れると失われる。</p>` : ''}
       <button type="button" class="btn primary big" data-run="fight">戦う</button></div>`;
   } else if (room.kind === 'chest') {
-    action = `<div class="room-card rk-chest"><p class="eyebrow">宝箱</p><b>古びた宝箱がある</b>
+    action = isLooted(run)
+      ? `<div class="room-card rk-chest"><p class="eyebrow">宝箱</p><b>開けた宝箱がある</b><span>中身はもう取った。</span>
+      <button type="button" class="btn primary big" data-run="open">先へ進む</button></div>`
+      : `<div class="room-card rk-chest"><p class="eyebrow">宝箱</p><b>古びた宝箱がある</b>
       <button type="button" class="btn primary big" data-run="open">開ける</button></div>`;
   } else {
     const rested = run.hp === null && run.fp === null;
@@ -167,8 +173,8 @@ function renderRun(): void {
 }
 
 function resultHTML({ run: r, banked }: { run: RunState; banked: Banked }): string {
-  const title = r.status === 'cleared' ? '踏破' : r.status === 'retreated' ? '退却' : 'あなたは倒れた';
-  const kept = r.status === 'dead'
+  const title = r.status === 'cleared' ? '踏破' : r.status === 'retreated' ? '退却' : '探索を諦めた';
+  const kept = r.status === 'abandoned'
     ? `<p class="note">この探索で得たソウルと拾ったものは、すべて失われました。</p>`
     : `<ul class="gains">
         <li>ソウル <b>+${banked.souls}</b></li>
@@ -186,7 +192,7 @@ function finish(next: RunState): void {
   clearRun(next.charId);
   if (!c) return onBack();
   const { character, banked } = bankRun(c, next);
-  if (next.status !== 'dead') upsertCharacter(character);
+  if (next.status === 'cleared' || next.status === 'retreated') upsertCharacter(character);
   result = { run: next, banked };
   show('run');
   renderRun();
@@ -207,15 +213,32 @@ function fight(): void {
   if (!c || !dungeon || !run) return;
   const room = currentRoom(dungeon, run)!;
   const d = dungeon;
-  const r = run;
+  let r = run;
+  const stain = stainHere(r);
+  const firstLoot = room.loot && !isLooted(r);
   startBattle(c, room.enemy!, (won, me) => {
     if (won) {
-      const gotLoot = room.loot ? `「${lootName(room.loot)}」を拾った。` : '';
-      step(winBattle(d, r, me.hp, me.fp), `${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}`);
+      const gotLoot = firstLoot ? `「${lootName(room.loot!)}」を拾った。` : '';
+      const lostStain = stainHere(r) ? `回収しなかった血痕のソウル ${stainHere(r)!.souls} は失われた。` : '';
+      step(winBattle(d, r, me.hp, me.fp), `${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}${lostStain}`);
     } else {
-      step(loseBattle(r));
+      const prev = r.stain ? `前の血痕のソウル ${r.stain.souls} は失われた。` : '';
+      const dropped = r.souls > 0 ? `ソウル ${r.souls} をこの部屋に落とした。` : '';
+      step(loseBattle(r), `あなたは倒れた。${dropped}${prev}最初の部屋からやり直す。`);
     }
-  }, { hp: r.hp, fp: r.fp, foeHpRatio: room.hpRatio, surrenderNote: '地下墓で降参すると倒れたことになり、この探索で得たものをすべて失います。' });
+  }, {
+    hp: r.hp, fp: r.fp, foeHpRatio: room.hpRatio,
+    surrenderNote: '地下墓で降参すると倒れたことになります。持っているソウルはこの部屋に落ち、最初の部屋からやり直しです。',
+    special: stain ? {
+      label: `ソウルを回収する（${stain.souls}）`,
+      note: 'この手番を使って、落としたソウルを取り戻す。ダイスは振らずに手番が終わる。',
+      use: () => {
+        r = retrieveStain(r);
+        saveRun(r);
+        return `落としたソウル ${stain.souls} を取り戻した。`;
+      },
+    } : undefined,
+  });
 }
 
 /* ---------------- 操作 ---------------- */
@@ -252,7 +275,7 @@ export function bindCatacombs(): void {
         return fight();
       case 'open':
         return step(openChest(dungeon, run),
-          room?.loot ? `宝箱から「${lootName(room.loot)}」を見つけた。` : `宝箱にはソウルが残っていた。ソウル +${room?.souls ?? 0}。`);
+          isLooted(run) ? '' : room?.loot ? `宝箱から「${lootName(room.loot)}」を見つけた。` : `宝箱にはソウルが残っていた。ソウル +${room?.souls ?? 0}。`);
       case 'rest':
         return step(rest(run), '篝火で休んだ。HPとFPが戻った。');
       case 'next':
@@ -266,7 +289,7 @@ export function bindCatacombs(): void {
         confirmAbandon = false;
         return renderRun();
       case 'abandon-yes':
-        return step(loseBattle(run));
+        return step(abandon(run));
       case 'done':
         result = null;
         dungeon = null;
