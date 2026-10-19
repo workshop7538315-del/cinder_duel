@@ -44,12 +44,15 @@ export interface RunState {
   bonfire?: { floor: number; room: number } | null;
   /** 入口の篝火にいる */
   atEntrance?: boolean;
+  /** 周回（なければ1周目） */
+  cycle?: number;
 }
 
 export function startRun(charId: string, d: Dungeon): RunState {
   return {
     charId, catacombId: d.catacombId, seed: d.seed, level: d.level,
     floor: 0, room: 0, hp: null, fp: null, souls: 0, loot: [], status: 'active', stain: null, looted: [], deaths: 0,
+    ...(d.cycle && d.cycle > 1 ? { cycle: d.cycle } : {}),
   };
 }
 
@@ -95,8 +98,8 @@ function gain(run: RunState, room: Room, souls: boolean): RunState {
   return {
     ...run,
     souls: run.souls + (souls ? room.souls : 0),
-    loot: room.loot && first ? [...run.loot, { ...room.loot, floor: run.floor }] : run.loot,
-    looted: first && (room.loot || room.kind === 'chest') ? [...(run.looted ?? []), roomKey(run)] : run.looted ?? [],
+    loot: first ? [...run.loot, ...[room.loot, room.extra].filter((l): l is LootDef => !!l).map((l) => ({ ...l, floor: run.floor }))] : run.loot,
+    looted: first && (room.loot || room.extra || room.kind === 'chest') ? [...(run.looted ?? []), roomKey(run)] : run.looted ?? [],
   };
 }
 

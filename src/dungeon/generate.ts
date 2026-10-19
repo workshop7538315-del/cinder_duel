@@ -2,6 +2,7 @@ import { autoAlloc, autoDeck, inventoryOf, loadout, type Character } from '../ch
 import { CATACOMB_ORDER, CATACOMBS, DUNGEON, HOLLOW, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
 import { ABYSS, ABYSS_KEYS, ABYSSES, BASILISK, SEA_KEY, SEAFLOOR } from '../data/abyss';
 import { FIXED, FIXED_CATACOMBS } from '../data/fixed';
+import { CATACOMB_ACCESSORIES } from '../data/accessories';
 import { pick, pickWeighted, randInt, seededRng, type SeededRng } from './rng';
 
 export type RoomKind = 'battle' | 'chest' | 'bonfire' | 'boss';
@@ -18,6 +19,8 @@ export interface Room {
   loot: LootDef | null;
   /** 手がかり（困難な地下墓のID）。見つけた時点で覚える */
   clue?: string;
+  /** 2周目以降の追加の落とし物（アクセサリ） */
+  extra?: LootDef | null;
 }
 
 export interface Dungeon {
@@ -33,6 +36,8 @@ export interface Dungeon {
   totalRooms: number;
   /** 0〜1。部屋が多いほど高く、良いものが出やすい */
   quality: number;
+  /** 周回（1周目なら 1。2周目以降は敵が強く、アクセサリが出る） */
+  cycle?: number;
 }
 
 export const ROOM_NAMES: Record<RoomKind, string> = { battle: '敵', chest: '宝箱', bonfire: '篝火', boss: '主' };
@@ -113,22 +118,43 @@ export const catacombFromSeed = (seed: string): string =>
   fixedFromSeed(seed) ? `fixed:${fixedFromSeed(seed)}` : catacombFromSeedV1(seed);
 
 /** シードから地下墓を作る。同じシード・レベルなら必ず同じ地下墓・同じ中身になる */
-export function generateDungeon(seed: string, level: number): Dungeon {
+export function generateDungeon(seed: string, level: number, cycle = 1): Dungeon {
   const s = normalizeSeed(seed);
   const fixed = fixedFromSeed(s);
   if (fixed) return buildFixed(fixed, level);
   const gen = GENERATORS[seedVersion(s)];
   if (!gen) throw new Error('このシードは新しいバージョンのものです。ページを再読み込みしてください。');
-  return gen(s, level);
+  return withCycle(gen, s, level, cycle);
+}
+
+/**
+ * 周回。2周目以降は、同じ間取り・敵・宝のまま敵のレベルを上げ（1周ごとに cycleLevelStep）、
+ * 主・宝箱がアクセサリを追加で落とすようになる（別の乱数で決めるので、1周目の中身は変わらない）。
+ * Dungeon.level は入ったときの自分のレベルのまま（作り直すときに使う）
+ */
+function withCycle(gen: Generator, seed: string, level: number, cycle: number): Dungeon {
+  const c = Math.max(1, Math.floor(cycle));
+  if (c === 1) return gen(seed, level);
+  const d = gen(seed, level + (c - 1) * DUNGEON.cycleLevelStep);
+  const pool = CATACOMB_ACCESSORIES[d.catacombId] ?? [];
+  d.floors.forEach((rooms, fi) => rooms.forEach((room, ri) => {
+    const last = fi === d.floors.length - 1;
+    const chance = room.kind === 'boss' ? (last ? DUNGEON.cycleBossAccessory : DUNGEON.cycleFloorBossAccessory)
+      : room.kind === 'chest' ? DUNGEON.cycleChestAccessory : 0;
+    if (!chance || !pool.length) return;
+    const r = seededRng(`cycle:${d.catacombId}:${seed}:${c}:${fi}:${ri}`);
+    if (r() < chance) room.extra = { kind: 'item', id: pick(r, pool), tier: 3 };
+  }));
+  return { ...d, level, cycle: c };
 }
 
 /** 探索を再開するとき（入ったときの地下墓をそのまま作り直す） */
-export function rebuildDungeon(catacombId: string, seed: string, level: number): Dungeon {
+export function rebuildDungeon(catacombId: string, seed: string, level: number, cycle = 1): Dungeon {
   if (catacombId.startsWith('fixed:')) return buildFixed(catacombId.slice(6), level);
   if (catacombId.startsWith('abyss:')) return buildAbyss(catacombId.slice(6), seed, level);
   const gen = GENERATORS[seedVersion(seed)] ?? GENERATORS[1];
-  const d = gen(seed, level);
-  return d.catacombId === catacombId ? d : buildCatacomb(catacombId, seed, level);
+  const d = withCycle(gen, seed, level, cycle);
+  return d.catacombId === catacombId ? d : withCycle((s, l) => buildCatacomb(catacombId, s, l), seed, level, cycle);
 }
 
 /** 用意されたシードのまま入ったとき、困難な地下墓に迷い込むか（迷い込むならそのシード） */

@@ -56,6 +56,7 @@ export function guardCost(f: Fighter, raw: number): number {
   let c = RULES.guardBase + Math.floor(raw / RULES.guardPer);
   if (f.left?.kind === 'shield') c -= f.left.guardBonus ?? 0;
   if (f.buffs.stance) c -= RULES.stanceGuardDiscount;
+  c -= f.acc?.guardDiscount ?? 0;
   if (f.buffs.broken) c += RULES.kickBreak;
   return Math.max(1, c);
 }

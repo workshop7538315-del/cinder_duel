@@ -32,6 +32,7 @@ export function makeFighter(c: Character, isPlayer: boolean): Fighter {
     chain: 0,
     bleed: 0,
     buffs: {},
+    acc: lo.acc,
   };
 }
 

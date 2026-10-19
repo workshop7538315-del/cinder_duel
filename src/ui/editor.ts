@@ -1,9 +1,10 @@
 import {
-  allocTotal, autoDeck, buyLevel, canBuyLevel, charLevel, levelBudget, cardBlock, checkCharacter, countCards, loadout, newCharacter,
+  allocTotal, autoDeck, charStats, buyLevel, canBuyLevel, charLevel, levelBudget, cardBlock, checkCharacter, countCards, loadout, newCharacter,
   type Character, type EquipSlot,
 } from '../character/model';
 import { CARDS } from '../data/cards';
 import { CLASSES, STAT_NAMES, STAT_ORDER } from '../data/classes';
+import { ACCESSORIES, accessoryText } from '../data/accessories';
 import { ARMORS, ARMOR_SLOTS, SHIELDS, WEAPONS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { costLabel, kg, pct, reqLabel, typeName } from '../engine/format';
@@ -89,13 +90,14 @@ function render(): void {
     att: `FP ${lo.derived.maxFp}`,
     end: `スタミナ ${lo.derived.stInit}／${lo.derived.stMax}・重量 ${kg(lo.equipLoad)}`,
   };
+  const baseStats = charStats(c);
   const statRows = STAT_ORDER.map((k) => {
     const min = minAlloc?.[k] ?? 0;
     const canDown = c.alloc[k] > min;
-    const canUp = (left > 0 || canBuyLevel(c)) && lo.stats[k] < RULES.statMax;
+    const canUp = (left > 0 || canBuyLevel(c)) && baseStats[k] < RULES.statMax;
     return `<div class="st-row">
       <span class="st-name">${STAT_NAMES[k]}</span>
-      <span class="st-val">${lo.stats[k]}</span>
+      <span class="st-val">${lo.stats[k]}${lo.stats[k] !== baseStats[k] ? `<small class="acc-up" title="アクセサリで+${lo.stats[k] - baseStats[k]}">*</small>` : ''}</span>
       <span class="st-add">${c.alloc[k] ? `+${c.alloc[k]}` : ''}</span>
       <span class="st-btns">
         <button type="button" data-stat="${k}" data-d="-1" aria-label="${STAT_NAMES[k]}を下げる" ${canDown ? '' : 'disabled'}>−</button>
@@ -123,6 +125,18 @@ function render(): void {
     const a = c.equip[slot] ? ARMORS[c.equip[slot]!] : null;
     const detail = a ? `重さ ${kg(a.weight)}　カット 物理${pct(a.cut.phys)}・魔力${pct(a.cut.magic)}・聖${pct(a.cut.holy)}` : '<span class="dim">なし</span>';
     return slotRow(slot, name, list, 'なし', detail);
+  }).join('');
+
+  // アクセサリ（指輪・タリスマン）
+  const accs = c.accessories ?? [];
+  const ownAccs = Object.entries(ACCESSORIES).filter(([id]) => own(id));
+  const accRows = Array.from({ length: RULES.accessorySlots }, (_, i) => {
+    const cur = accs[i] ?? null;
+    const list = ownAccs.filter(([id]) => id === cur || !accs.includes(id)).map(([id, a]) => [id, `${a.name}（${kg(a.weight)}）`] as [string, string]);
+    const a = cur ? ACCESSORIES[cur] : null;
+    return `<div class="eq-row"><label for="acc-${i}">アクセサリ${i + 1}</label>
+      <select id="acc-${i}" data-acc="${i}">${options(list, cur, 'なし')}</select>
+      <p class="eq-detail">${a ? `${a.kind}・${accessoryText(a)}` : '<span class="dim">なし</span>'}</p></div>`;
   }).join('');
 
   const ratio = Math.min(lo.ratio, 1.2);
@@ -174,6 +188,7 @@ function render(): void {
       ${slotRow('right', '右手', weaponList, '素手', handDetail(c.equip.right ? lo.right : null, stats))}
       ${slotRow('left', '左手', leftList, 'なし', handDetail(lo.left, stats))}
       ${armorRows}
+      ${ownAccs.length ? accRows : `<p class="note dim">アクセサリ（指輪・タリスマン）は、地下墓の2周目以降で手に入ります。${RULES.accessorySlots}つまで身につけられます。</p>`}
       ${weightBox}
     </section>
     <section class="ed-sec">
@@ -252,6 +267,14 @@ function onClick(ev: Event): void {
 function onChange(ev: Event): void {
   if (!D) return;
   const t = ev.target as HTMLSelectElement;
+  if (t.dataset.acc !== undefined) {
+    const list = [...(D.c.accessories ?? [])];
+    const i = Number(t.dataset.acc);
+    if (t.value) list[i] = t.value;
+    else list.splice(i, 1);
+    D.c.accessories = [...new Set(list.filter(Boolean))].slice(0, RULES.accessorySlots);
+    return render();
+  }
   const slot = t.dataset.slot as EquipSlot | undefined;
   if (!slot) return;
   D.c.equip[slot] = t.value || null;
