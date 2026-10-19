@@ -27,14 +27,14 @@ describe('底の構成', () => {
       expect(rebuildDungeon(d.catacombId, 'x', 30)).toEqual(d);
     }
   });
-  it('専用の物は底ごとに4つ（触媒の剣・底の魔術・捨てると発動する道具・2本目の武器）。武器は淵結晶をはめられる', () => {
+  it('専用の物は底ごとに4つ（触媒の剣・底の祈祷・捨てると発動する道具・2本目の武器）。武器は淵結晶をはめられる', () => {
     for (const a of Object.values(ABYSSES)) {
       expect(a.loot).toHaveLength(4);
       const [staff, spell, item, second] = a.loot;
       expect(staff.kind).toBe('item');
       expect(WEAPONS[staff.id].sockets).toBe(3);
       expect(WEAPONS[second.id].sockets).toBe(3);
-      expect(WEAPONS[second.id].school).toBe('sorcery');
+      expect(WEAPONS[second.id].school).toBe('incant');
       expect(CARDS[spell.id].discard).toBeTruthy();
       expect(CARDS[item.id].onDiscard).toBeTruthy();
       expect(CARDS[item.id].unplayable).toBe(true);
@@ -149,9 +149,9 @@ describe('海底', () => {
     expect(last[last.length - 1].loot!.id).toBe('sea_harpoon');
     expect(rebuildDungeon(a.catacombId, 'a', 30)).toEqual(a);
   });
-  it('専用の物は3つ（触媒武器・捨てて使う魔術・捨てると発動する道具）', () => {
+  it('専用の物は3つ（触媒武器・捨てて使う祈祷・捨てると発動する道具）', () => {
     const [w, spell, item] = SEAFLOOR.loot;
-    expect(WEAPONS[w.id].school).toBe('sorcery');
+    expect(WEAPONS[w.id].school).toBe('incant');
     expect(CARDS[spell.id].discard).toBeTruthy();
     expect(CARDS[item.id].onDiscard).toBeTruthy();
     // すべて海底のどこかで手に入る
