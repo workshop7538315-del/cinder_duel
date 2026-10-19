@@ -3,10 +3,9 @@ import { RULES } from '../data/rules';
 import { findPayment, isValidPayment, stageCost } from '../engine/cost';
 import { rollDice, rollMany } from '../engine/dice';
 import {
-  addBleed, addCurse, applyArmor, catalystFor, drainLevel, dodgeCost, drawCard, enchantBleed, enchantBonus, guardCost, guardCut, spend,
+  addBleed, addCurse, applyArmor, catalystFor, dodgeCost, drawCard, enchantBleed, enchantBonus, guardCost, guardCut, spend,
   weaponBleed, weaponDamage,
 } from '../engine/fighter';
-import { STAT_NAMES } from '../data/classes';
 import { costLabel, typeName } from '../engine/format';
 import type { Attack, Cost, Die, Fighter, WeaponArt } from '../engine/types';
 import { npcDiscards, npcDraws, npcReactChoice, npcReactDice, npcTurn } from './ai';
@@ -370,20 +369,19 @@ export class Battle {
     if (def.hp <= 0) this.finish(att);
   }
 
-  /** 呪死を溜め、溜まりきったら即死。レベルを下げる攻撃ならレベルを1下げる */
+  /** 呪死を溜め、溜まりきったら即死。レベルを奪う攻撃で呪死したら、レベルを1失う（戦闘後にキャラへ反映） */
   private applyCurse(def: Fighter, atk: Attack, guarded: boolean): void {
     if (def.hp <= 0) return;
-    if (atk.drain && !guarded) {
-      const before = def.stats;
-      const k = drainLevel(def);
-      this.log(`${this.who(def)}のレベルが下がった（${STAT_NAMES[k]} ${before[k]}→${def.stats[k]}）。`, 'hit');
-    }
     let amount = atk.curse ?? 0;
     if (guarded) amount = Math.floor(amount * RULES.curseGuardRatio);
     if (amount <= 0) return;
     if (addCurse(def, amount)) {
       def.hp = 0;
       this.log(`${this.who(def)}は呪死した。`, 'hit');
+      if (atk.drain) {
+        def.drained = (def.drained ?? 0) + 1;
+        this.log(`${this.who(def)}はレベルを1失った。`, 'hit');
+      }
       this.io.flash(def);
     } else {
       this.log(`${this.who(def)}に呪死が溜まった（${def.curse}/${RULES.curseThreshold}）。`);

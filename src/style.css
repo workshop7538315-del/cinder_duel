@@ -88,6 +88,8 @@ input:focus-visible,select:focus-visible{outline:2px solid var(--ember);outline-
 .cls-pick b{font-family:var(--display)}
 .cls-pick small{color:var(--muted);font-size:11px}
 .cls-pick.on{border-color:var(--ember);background:#2a2219}
+.lvup{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.lvup b{color:var(--ember)}
 .st-list{display:flex;flex-direction:column}
 .st-row{display:grid;grid-template-columns:4.2em 2.2em 2.4em auto 1fr;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #262a31;font-variant-numeric:tabular-nums}
 .st-row:last-child{border-bottom:0}

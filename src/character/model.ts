@@ -3,7 +3,7 @@ import { CLASSES, STAT_NAMES, STAT_ORDER } from '../data/classes';
 import { ARMORS, FISTS, SHIELDS, WEAPONS, WEIGHTS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { reqLabel } from '../engine/format';
-import { derive, levelOf, meetsReq, unmetReq, weightKey } from '../engine/stats';
+import { derive, levelCost, levelOf, meetsReq, unmetReq, weightKey } from '../engine/stats';
 import type { ArmorSlot, Cut, HandItem, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
 
 export type EquipSlot = 'right' | 'left' | ArmorSlot;
@@ -32,8 +32,10 @@ export interface Character {
   souls: number;
   /** 知っている困難な地下墓（FIXED_CATACOMBS のキー）。手がかりで覚える */
   clues?: string[];
-  /** 失ったレベル（底から脱出したときなど）。この分だけ振れるレベルが減る */
+  /** 失ったレベル（底から脱出したとき、呪死したとき）。この分だけ振れるレベルが減る */
   lostLevels?: number;
+  /** ソウルで上げたレベル。この分だけ振れるレベルが増える */
+  boughtLevels?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -100,7 +102,7 @@ export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip'>): Load
   const left = leftItem(c.equip);
   const weight = equipWeight(c.equip);
   const ratio = weight / derived.equipLoad;
-  const schools = [right, left].flatMap((x) => (x && x.kind === 'catalyst' && x.school ? [x.school] : []));
+  const schools = [right, left].flatMap((x) => (x && x.kind !== 'shield' && x.school ? [x.school] : []));
   return {
     stats, level: levelOf(stats), right, left,
     rightOk: meetsReq(right.req, stats),
@@ -182,12 +184,13 @@ export function newCharacter(classId: string, name?: string): Character {
   return {
     id: newId(), name: name ?? cls.name, classId,
     alloc: zeroStats(), equip: { ...cls.equip }, deck: deckFromCounts(inventory.cards),
-    inventory, souls: 0, clues: [], lostLevels: 0, createdAt: now, updatedAt: now,
+    inventory, souls: 0, clues: [], lostLevels: 0, boughtLevels: 0, createdAt: now, updatedAt: now,
   };
 }
 
-/** 振れるレベルの上限（失ったレベルの分だけ減る） */
-export const levelBudget = (c: Pick<Character, 'lostLevels'>): number => Math.max(0, RULES.levelBudget - (c.lostLevels ?? 0));
+/** 振れるレベルの上限（作成時の30 ＋ ソウルで上げた分 − 失った分） */
+export const levelBudget = (c: Pick<Character, 'lostLevels' | 'boughtLevels'>): number =>
+  Math.max(0, RULES.levelBudget + (c.boughtLevels ?? 0) - (c.lostLevels ?? 0));
 
 /** いちばん高い能力値（振った分があるもの）から n だけ下げる */
 function reduceAlloc(c: Character, n: number, allowNegative: boolean): Stats {
@@ -205,12 +208,22 @@ function reduceAlloc(c: Character, n: number, allowNegative: boolean): Stats {
 /** レベルを失う（振った能力値が高いものから減り、振れる上限も減る） */
 export function loseLevels(c: Character, n: number): Character {
   const lostLevels = (c.lostLevels ?? 0) + n;
-  const over = Math.max(0, allocTotal(c.alloc) - Math.max(0, RULES.levelBudget - lostLevels));
+  const over = Math.max(0, allocTotal(c.alloc) - levelBudget({ ...c, lostLevels }));
   return { ...c, lostLevels, alloc: reduceAlloc(c, over, false), updatedAt: Date.now() };
 }
 
-/** 一時的にレベルを下げたキャラ（底でバジリスクに下げられた分）。保存しない */
-export const drainedCopy = (c: Character, n: number): Character => (n > 0 ? { ...c, alloc: reduceAlloc(c, n, true) } : c);
+
+/** ソウルでレベルを1上げられるか（振れるポイントが残っていないとき） */
+export function canBuyLevel(c: Character): boolean {
+  return c.souls >= levelCost(charLevel(c));
+}
+
+/** ソウルを払ってレベルを1上げる（振れる上限が1増える） */
+export function buyLevel(c: Character): Character {
+  const cost = levelCost(charLevel(c));
+  if (c.souls < cost) return c;
+  return { ...c, souls: c.souls - cost, boughtLevels: (c.boughtLevels ?? 0) + 1 };
+}
 
 export interface Issues {
   /** 保存できない問題 */
@@ -243,7 +256,7 @@ export function checkCharacter(c: Character, opts: CheckOptions = {}): Issues {
   }
 
   const lo = loadout(c);
-  if (c.equip.left && WEAPONS[c.equip.left]?.kind === 'weapon') errors.push('左手には盾か触媒しか持てません。');
+  if (c.equip.left && WEAPONS[c.equip.left]?.kind === 'weapon' && !WEAPONS[c.equip.left]?.school) errors.push('左手には盾か触媒（触媒を兼ねる武器を含む）しか持てません。');
   for (const id of equipIds(c.equip)) {
     if (!ownsItem(c, id)) errors.push(`「${(WEAPONS[id] ?? SHIELDS[id] ?? ARMORS[id])?.name ?? id}」を持っていません。`);
   }

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { allocTotal, charLevel, checkCharacter, drainedCopy, levelBudget, loseLevels, newCharacter } from '../src/character/model';
+import { allocTotal, charLevel, checkCharacter, levelBudget, loseLevels, newCharacter } from '../src/character/model';
 import { ABYSS, ABYSSES } from '../src/data/abyss';
 import { CARDS } from '../src/data/cards';
 import { RULES } from '../src/data/rules';
-import { addCurse, drainLevel } from '../src/engine/fighter';
+import { addCurse } from '../src/engine/fighter';
 import { buildAbyss, rebuildDungeon } from '../src/dungeon/generate';
 import { Battle, type BattleIO } from '../src/game/battle';
 import { makeFighter } from '../src/game/setup';
@@ -48,20 +48,19 @@ describe('呪死とレベル低下', () => {
     expect(addCurse(f, RULES.curseThreshold - 1)).toBe(false);
     expect(addCurse(f, 1)).toBe(true);
   });
-  it('レベルが下がると、いちばん高い能力値が1下がる', () => {
-    const f = makeFighter(newCharacter('vagabond'), true);
-    const lv = f.level;
-    const k = drainLevel(f);
-    expect(k).toBe('vit');
-    expect(f.level).toBe(lv - 1);
-    expect(f.drained).toBe(1);
-  });
-  it('探索中に下げられた分は、次の戦闘にも持ち越す（保存はしない）', () => {
-    const c = newCharacter('vagabond');
-    c.alloc.str = 10;
-    const d = drainedCopy(c, 2);
-    expect(charLevel(d)).toBe(charLevel(c) - 2);
-    expect(c.alloc.str).toBe(10);
+  it('レベルを奪う攻撃で呪死したときだけ、レベルを失う（当たっただけでは下がらない）', async () => {
+    const io = {
+      log: () => {}, update: () => {}, flash: () => {}, wait: () => Promise.resolve(),
+      askReactDice: async () => 0, askReactChoice: async () => 'take' as const, finished: () => {},
+    } as unknown as BattleIO;
+    const b = new Battle(makeFighter(newCharacter('vagabond'), true), makeFighter(newCharacter('wretch'), false), io);
+    const lv = b.p.level;
+    await b.strike(b.e, b.p, { label: '呪いの息', dmg: 1, type: 'magic', curse: 7, drain: true });
+    expect(b.p.drained ?? 0).toBe(0);
+    expect(b.p.level).toBe(lv);
+    await b.strike(b.e, b.p, { label: '呪いの息', dmg: 1, type: 'magic', curse: 7, drain: true });
+    expect(b.p.hp).toBe(0);
+    expect(b.p.drained).toBe(1);
   });
 });
 

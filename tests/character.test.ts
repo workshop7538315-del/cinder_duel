@@ -137,3 +137,35 @@ describe('持ち物', () => {
     expect(c.souls).toBe(0);
   });
 });
+
+import { buyLevel, canBuyLevel, levelBudget as budgetOf, loseLevels } from '../src/character/model';
+import { levelCost } from '../src/engine/stats';
+
+describe('レベルアップ（ソウル）', () => {
+  it('必要ソウルはレベルが上がるほど増える', () => {
+    expect(levelCost(10)).toBeLessThan(levelCost(30));
+    expect(levelCost(30)).toBeLessThan(levelCost(60));
+    expect(levelCost(1)).toBe(RULES.levelCostMin);
+  });
+  it('ソウルを払うと、振れるレベルが1増える', () => {
+    const c = newCharacter('vagabond');
+    c.alloc.vit = RULES.levelBudget;
+    c.souls = levelCost(charLevel(c));
+    expect(canBuyLevel(c)).toBe(true);
+    const b = buyLevel(c);
+    expect(b.souls).toBe(0);
+    expect(budgetOf(b)).toBe(RULES.levelBudget + 1);
+    b.alloc.str += 1;
+    expect(checkCharacter(b).errors).toEqual([]);
+    expect(canBuyLevel(b)).toBe(false);
+  });
+  it('失ったレベルは、ソウルで上げ直せる', () => {
+    const c = newCharacter('vagabond');
+    c.alloc.vit = RULES.levelBudget;
+    const lost = loseLevels(c, 3);
+    expect(budgetOf(lost)).toBe(RULES.levelBudget - 3);
+    let x = { ...lost, souls: 1_000_000 };
+    for (let i = 0; i < 3; i++) x = buyLevel(x);
+    expect(budgetOf(x)).toBe(RULES.levelBudget);
+  });
+});
