@@ -1,9 +1,7 @@
 import { autoAlloc, autoDeck, inventoryOf, loadout, type Character } from '../character/model';
-import { CATACOMB_ORDER, CATACOMBS, DUNGEON, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
+import { CATACOMB_ORDER, CATACOMBS, DUNGEON, HOLLOW, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
 import { ABYSS, ABYSS_KEYS, ABYSSES, BASILISK, SEA_KEY, SEAFLOOR } from '../data/abyss';
 import { FIXED, FIXED_CATACOMBS } from '../data/fixed';
-import { SHIELDS, WEAPONS } from '../data/equipment';
-import type { Requirements } from '../engine/types';
 import { pick, pickWeighted, randInt, seededRng, type SeededRng } from './rng';
 
 export type RoomKind = 'battle' | 'chest' | 'bonfire' | 'boss';
@@ -39,21 +37,10 @@ export interface Dungeon {
 
 export const ROOM_NAMES: Record<RoomKind, string> = { battle: '敵', chest: '宝箱', bonfire: '篝火', boss: '主' };
 
-/** 敵が両手の装備を使いこなすのに要る能力値（低いレベルの敵でも装備条件を満たすようにする） */
-function equipNeeds(def: EnemyDef): Requirements {
-  const need: Requirements = {};
-  for (const id of [def.equip.right, def.equip.left]) {
-    const it = id ? WEAPONS[id] ?? SHIELDS[id] : null;
-    if (!it) continue;
-    for (const [k, v] of Object.entries(it.req) as [keyof Requirements, number][]) need[k] = Math.max(need[k] ?? 0, v);
-  }
-  return need;
-}
-
 function buildEnemy(def: EnemyDef, level: number, tag: string): Character {
   const c: Character = {
     id: `enemy:${tag}`, name: def.name, classId: def.classId,
-    alloc: autoAlloc(def.classId, level, def.focus, equipNeeds(def)), equip: { ...def.equip },
+    alloc: autoAlloc(def.classId, level, def.focus), equip: { ...def.equip }, npc: true,
     deck: [], inventory: { items: [], cards: {} }, souls: 0, createdAt: 0, updatedAt: 0,
   };
   const lo = loadout(c);
@@ -85,13 +72,26 @@ export const normalizeSeed = (seed: string): string => seed.trim().toLowerCase()
  * こうすると、古いシードはずっと同じ地下墓のまま遊べる。
  * 数字のないシード（v0.7〜0.9で作ったもの）は第1版として扱う。
  */
-export const CURRENT_SEED_VERSION = 1;
+export const CURRENT_SEED_VERSION = 2;
 
 type Generator = (seed: string, level: number) => Dungeon;
 
 const GENERATORS: Record<number, Generator> = {
   1: (seed, level) => buildCatacomb(catacombFromSeedV1(seed), seed, level),
+  // 第2版: 第1版と同じ地下墓・間取り・宝で、最初の部屋の敵だけ弱い亡者になる
+  2: (seed, level) => withHollow(buildCatacomb(catacombFromSeedV1(seed), seed, level)),
 };
+
+/** 最初の部屋の敵を、弱い亡者に替える（落とし物はそのまま） */
+function withHollow(d: Dungeon): Dungeon {
+  const first = d.floors[0][0];
+  if (first.kind !== 'battle') return d;
+  const lv = Math.max(1, d.level + DUNGEON.hollowLevelOffset);
+  d.floors[0][0] = {
+    ...first, enemy: buildEnemy(HOLLOW, lv, `${d.catacombId}:${d.seed}:0:0`), hpRatio: DUNGEON.enemyHpRatio, souls: enemySouls(lv),
+  };
+  return d;
+}
 
 export function seedVersion(seed: string): number {
   const m = /^(\d+)-/.exec(normalizeSeed(seed));

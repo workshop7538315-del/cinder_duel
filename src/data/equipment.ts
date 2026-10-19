@@ -99,6 +99,13 @@ export const WEAPONS: Record<string, Weapon> = {
       dmg: { base: 5, scale: { arc: 0.2 } } },
   },
 
+  // ---- 亡者（地下墓の最初の敵。敵だけが使う） ----
+  hollow_blade: {
+    kind: 'weapon', name: '折れた直剣', weight: 0, req: {}, natural: true,
+    first: 3, inc: 3, maxChain: 1, type: 'phys',
+    dmg: { base: 3, scale: { str: 0.15 } }, cut: { phys: 0.2, magic: 0.1, holy: 0.1 },
+  },
+
   // ---- 海底の生き物（敵だけが使う） ----
   fishman_claw: {
     kind: 'weapon', name: '魚人の鉤爪', weight: 0, req: {}, natural: true, noEnchant: true,

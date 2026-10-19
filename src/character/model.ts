@@ -4,7 +4,7 @@ import { ARMORS, FISTS, SHIELDS, WEAPONS, WEIGHTS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { reqLabel } from '../engine/format';
 import { derive, levelCost, levelOf, meetsReq, unmetReq, weightKey } from '../engine/stats';
-import type { ArmorSlot, Cut, HandItem, Requirements, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
+import type { ArmorSlot, Cut, HandItem, School, StatKey, Stats, Weapon, WeightClass } from '../engine/types';
 
 export type EquipSlot = 'right' | 'left' | ArmorSlot;
 export type Equip = Record<EquipSlot, string | null>;
@@ -30,6 +30,8 @@ export interface Character {
   inventory: Inventory;
   /** 持っているソウル */
   souls: number;
+  /** NPC（地下墓の敵・練習試合の相手）。装備条件を無視して装備を使いこなす（保存はしない） */
+  npc?: boolean;
   /** 知っている困難な地下墓（FIXED_CATACOMBS のキー）。手がかりで覚える */
   clues?: string[];
   /** 踏破した底（ABYSS_KEYS のどれか）。踏破した底には、入口から直接入れる */
@@ -99,7 +101,7 @@ export interface Loadout {
   derived: ReturnType<typeof derive>;
 }
 
-export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip'>): Loadout {
+export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip' | 'npc'>): Loadout {
   const stats = charStats(c);
   const derived = derive(stats);
   const right = rightItem(c.equip);
@@ -109,8 +111,8 @@ export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip'>): Load
   const schools = [right, left].flatMap((x) => (x && x.kind !== 'shield' && x.school ? [x.school] : []));
   return {
     stats, level: levelOf(stats), right, left,
-    rightOk: meetsReq(right.req, stats),
-    leftOk: left ? meetsReq(left.req, stats) : true,
+    rightOk: !!c.npc || meetsReq(right.req, stats),
+    leftOk: !left || !!c.npc || meetsReq(left.req, stats),
     weight, equipLoad: derived.equipLoad, ratio,
     weightClass: WEIGHTS[weightKey(ratio)],
     armorCut: armorCut(c.equip),
@@ -229,6 +231,22 @@ export function buyLevel(c: Character): Character {
   return { ...c, souls: c.souls - cost, boughtLevels: (c.boughtLevels ?? 0) + 1 };
 }
 
+/** 篝火で能力値を1上げる。振れるポイントが残っていればそれを使い、なければソウルを払う。
+ *  ソウルは持ち歩いている分（carried。地下墓で拾ったまだ持ち帰っていないもの）から先に払い、足りなければ貯めた分から払う。
+ *  上げられなければ null */
+export function levelUpAtBonfire(c: Character, stat: StatKey, carried: number): { character: Character; carried: number } | null {
+  if (charStats(c)[stat] >= RULES.statMax) return null;
+  const alloc = { ...c.alloc, [stat]: c.alloc[stat] + 1 };
+  if (allocTotal(c.alloc) < levelBudget(c)) return { character: { ...c, alloc, updatedAt: Date.now() }, carried };
+  const cost = levelCost(charLevel(c));
+  if (carried + c.souls < cost) return null;
+  const fromCarried = Math.min(carried, cost);
+  return {
+    character: { ...c, alloc, souls: c.souls - (cost - fromCarried), boughtLevels: (c.boughtLevels ?? 0) + 1, updatedAt: Date.now() },
+    carried: carried - fromCarried,
+  };
+}
+
 export interface Issues {
   /** 保存できない問題 */
   errors: string[];
@@ -287,18 +305,10 @@ export function checkCharacter(c: Character, opts: CheckOptions = {}): Issues {
 }
 
 /** 決めた比率で能力値を振る（プリセットの敵を作るとき用） */
-/** 能力値を自動で振る。need を渡すと、まずその値（装備条件など）に届くよう振る。
- *  届かせるのにレベルが足りなければ、そのぶんレベルが上がる */
-export function autoAlloc(classId: string, level: number, focus: Partial<Record<StatKey, number>>, need: Requirements = {}): Stats {
+export function autoAlloc(classId: string, level: number, focus: Partial<Record<StatKey, number>>): Stats {
   const base = CLASSES[classId].stats;
   const alloc = zeroStats();
   let points = Math.max(0, level - CLASSES[classId].level);
-  for (const [k, v] of Object.entries(need) as [StatKey, number][]) {
-    const d = Math.max(0, Math.min(v, RULES.statMax) - base[k]);
-    alloc[k] += d;
-    points -= d;
-  }
-  points = Math.max(0, points);
   const keys = STAT_ORDER.filter((k) => (focus[k] ?? 0) > 0);
   while (points > 0 && keys.length) {
     let best = keys[0];

@@ -295,3 +295,9 @@ button.die{padding:7px}
 .abyss-warn b{font-size:17px;letter-spacing:.04em}
 .abyss-warn span{color:inherit;line-height:1.6}
 .abyss-warn .btn{align-self:flex-start}
+
+/* ---- 篝火でのレベルアップ ---- */
+.bf-lv{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)}
+.bf-stats{display:grid;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:6px}
+.bf-stats .btn{justify-content:space-between;font-size:13px;padding:8px 10px}
+.bf-stats .btn b{margin-left:auto;margin-right:6px}

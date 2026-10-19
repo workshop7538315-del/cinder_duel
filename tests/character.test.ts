@@ -177,3 +177,38 @@ describe('レベルアップ（ソウル）', () => {
     expect(budgetOf(x)).toBe(RULES.legacyFreeLevels);
   });
 });
+
+import { levelUpAtBonfire } from '../src/character/model';
+
+describe('篝火でのレベルアップ', () => {
+  it('持ち歩いているソウルから先に払い、足りなければ貯めた分から払う', () => {
+    const c = newCharacter('vagabond');
+    const cost = levelCost(charLevel(c));
+    const r = levelUpAtBonfire({ ...c, souls: cost }, 'vit', 10)!;
+    expect(r.carried).toBe(0);
+    expect(r.character.souls).toBe(10);
+    expect(r.character.alloc.vit).toBe(1);
+    expect(charLevel(r.character)).toBe(charLevel(c) + 1);
+    expect(checkCharacter(r.character).errors).toEqual([]);
+    const r2 = levelUpAtBonfire(c, 'str', cost + 5)!;
+    expect(r2.carried).toBe(5);
+    expect(r2.character.souls).toBe(0);
+  });
+  it('ソウルが足りなければ上げられない。振れるポイントが残っていればソウルはいらない', () => {
+    const c = newCharacter('vagabond');
+    expect(levelUpAtBonfire(c, 'vit', 0)).toBeNull();
+    const legacy = { ...c, freeLevels: 30 };
+    const r = levelUpAtBonfire(legacy, 'vit', 0)!;
+    expect(r.character.alloc.vit).toBe(1);
+    expect(r.character.boughtLevels).toBe(0);
+  });
+});
+
+describe('NPCは装備条件を無視する', () => {
+  it('能力不足でも、NPCなら装備を使いこなす', () => {
+    const c = newCharacter('wretch');
+    c.equip.right = 'greatsword';
+    expect(loadout(c).rightOk).toBe(false);
+    expect(loadout({ ...c, npc: true }).rightOk).toBe(true);
+  });
+});

@@ -9,7 +9,7 @@ export function presetCharacter(id: string, p: PresetDef = PRESETS[id]): Charact
   const c: Character = {
     id: `preset:${id}`, name: p.name, classId: p.classId,
     alloc: autoAlloc(p.classId, p.level, p.focus),
-    equip: { ...p.equip }, deck: [], inventory: { items: [], cards: {} }, souls: 0, createdAt: 0, updatedAt: 0,
+    equip: { ...p.equip }, npc: true, deck: [], inventory: { items: [], cards: {} }, souls: 0, createdAt: 0, updatedAt: 0,
   };
   const lo = loadout(c);
   c.deck = p.deck ? [...p.deck] : autoDeck(lo.stats, lo.schools, lo.right);
