@@ -54,7 +54,7 @@ export interface WeaponArt {
   bleed?: Scaling;
   /** 呪死の蓄積（溜まりきると即死） */
   curse?: number;
-  /** 当たると相手のレベルを1下げる */
+  /** これで呪死すると、レベルを1失う */
   drain?: boolean;
   /** あると、自分の手番には使えないリアクション専用の戦技になる。
    *  回避として使い、そのあと相手が攻撃以外の行動をしたら counterCost を追加で払って反撃できる */
@@ -158,7 +158,7 @@ export interface Fighter {
   bleed: number;
   /** 溜まっている呪死。上限に達すると即死 */
   curse?: number;
-  /** この探索で下げられたレベル */
+  /** この戦闘で呪死してレベルを失った回数（戦闘後にキャラへ反映） */
   drained?: number;
   buffs: Buffs;
 }
@@ -174,7 +174,7 @@ export interface Attack {
   bleed?: number;
   /** 当たったときに溜まる呪死 */
   curse?: number;
-  /** 当たると相手のレベルを1下げる */
+  /** これで呪死すると、レベルを1失う */
   drain?: boolean;
   /** 反撃など、受け手がリアクションできない攻撃 */
   noReaction?: boolean;

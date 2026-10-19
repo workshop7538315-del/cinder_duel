@@ -13,7 +13,10 @@ export const CURVES = {
 
 export const RULES = {
   // キャラクリ
-  levelBudget: 30, //  作成時に上げられるレベル
+  levelBudget: 30, //  作成時に上げられるレベル（これ以降はソウルで上げる）
+  /** レベルアップに要るソウル = エルデンリングの式 × この倍率（最低 levelCostMin） */
+  levelCostScale: 0.5,
+  levelCostMin: 100,
   statMax: 99,
   levelBand: 15, //    対戦相手のレベル差の上限
   deckMin: 12,

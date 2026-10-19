@@ -25,6 +25,13 @@ export function derive(s: Stats) {
   };
 }
 
+/** 今のレベルから1上げるのに要るソウル（エルデンリングの式を縮めたもの） */
+export function levelCost(level: number): number {
+  const x = level + 1;
+  const er = 0.02 * x ** 3 + 3.06 * x ** 2 + 105.6 * x - 895;
+  return Math.max(RULES.levelCostMin, Math.floor(er * RULES.levelCostScale));
+}
+
 /** レベル = 能力値の合計 − 79（エルデンリングと同じ） */
 export const levelOf = (s: Stats): number => Object.values(s).reduce((a, b) => a + b, 0) - 79;
 

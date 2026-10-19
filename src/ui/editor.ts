@@ -1,5 +1,5 @@
 import {
-  allocTotal, autoDeck, levelBudget, cardBlock, checkCharacter, countCards, loadout, newCharacter,
+  allocTotal, autoDeck, buyLevel, canBuyLevel, charLevel, levelBudget, cardBlock, checkCharacter, countCards, loadout, newCharacter,
   type Character, type EquipSlot,
 } from '../character/model';
 import { CARDS } from '../data/cards';
@@ -7,7 +7,7 @@ import { CLASSES, STAT_NAMES, STAT_ORDER } from '../data/classes';
 import { ARMORS, ARMOR_SLOTS, SHIELDS, WEAPONS } from '../data/equipment';
 import { RULES } from '../data/rules';
 import { costLabel, kg, pct, reqLabel, typeName } from '../engine/format';
-import { meetsReq } from '../engine/stats';
+import { levelCost, meetsReq } from '../engine/stats';
 import { scaleLabel, scaled } from '../engine/scaling';
 import type { HandItem, StatKey, Stats } from '../engine/types';
 import { $, esc, show } from './dom';
@@ -18,6 +18,8 @@ interface Draft {
   isNew: boolean;
   /** 保存済みのキャラは、振った能力値をこれより下げられない */
   minAlloc: Stats | null;
+  /** この編集でソウルを払って上げた能力値（下げると払い戻す） */
+  bought: StatKey[];
 }
 let D: Draft | null = null;
 let onDone: () => void = () => {};
@@ -28,8 +30,8 @@ export function openEditor(id: string | null, done: () => void): void {
   onDone = done;
   const existing = id ? findCharacter(id) : undefined;
   D = existing
-    ? { c: clone(existing), isNew: false, minAlloc: { ...existing.alloc } }
-    : { c: newCharacter('vagabond'), isNew: true, minAlloc: null };
+    ? { c: clone(existing), isNew: false, minAlloc: { ...existing.alloc }, bought: [] }
+    : { c: newCharacter('vagabond'), isNew: true, minAlloc: null, bought: [] };
   $('#edTitle').textContent = D.isNew ? 'キャラクターを作る' : 'キャラクターを編集';
   $<HTMLInputElement>('#edName').value = D.c.name;
   show('editor');
@@ -50,7 +52,7 @@ function handDetail(item: HandItem | null, stats: Stats): string {
       parts.push(`戦技「${item.art.name}」${costLabel(item.art.cost, item.art.fp)}${item.art.bleed ? '・出血あり' : ''}${r ? `（回避として使い、反撃${costLabel(r.counterCost)}）` : ''}`);
     }
     if (item.noEnchant) parts.push('エンチャント不可');
-    if (item.kind === 'catalyst' && item.power) parts.push(`${item.school === 'sorcery' ? '魔術' : '祈祷'}の触媒（${scaleLabel(item.power)}）`);
+    if (item.school && item.power) parts.push(`${item.school === 'sorcery' ? '魔術' : '祈祷'}の触媒${item.kind === 'weapon' ? 'を兼ねる' : ''}（${scaleLabel(item.power)}）`);
   }
   parts.push(`受け 物理${pct(item.cut.phys)}・魔力${pct(item.cut.magic)}・聖${pct(item.cut.holy)}`);
   if (item.kind === 'shield' && item.guardBonus) parts.push(`ガード消費-${item.guardBonus}`);
@@ -90,7 +92,7 @@ function render(): void {
   const statRows = STAT_ORDER.map((k) => {
     const min = minAlloc?.[k] ?? 0;
     const canDown = c.alloc[k] > min;
-    const canUp = left > 0 && lo.stats[k] < RULES.statMax;
+    const canUp = (left > 0 || canBuyLevel(c)) && lo.stats[k] < RULES.statMax;
     return `<div class="st-row">
       <span class="st-name">${STAT_NAMES[k]}</span>
       <span class="st-val">${lo.stats[k]}</span>
@@ -109,7 +111,7 @@ function render(): void {
   const weaponList = Object.entries(WEAPONS).filter(([id]) => own(id)).map(([id, w]) => [id, `${w.name}（${kg(w.weight)}）${meetsReq(w.req, stats) ? '' : ' ※能力不足'}`] as [string, string]);
   const leftList: [string, string][] = [
     ...Object.entries(SHIELDS).filter(([id]) => own(id)).map(([id, s]) => [id, `${s.name}（${kg(s.weight)}）${meetsReq(s.req, stats) ? '' : ' ※能力不足'}`] as [string, string]),
-    ...Object.entries(WEAPONS).filter(([id, w]) => w.kind === 'catalyst' && own(id))
+    ...Object.entries(WEAPONS).filter(([id, w]) => (w.kind === 'catalyst' || w.school) && own(id))
       .map(([id, w]) => [id, `${w.name}（${kg(w.weight)}）${meetsReq(w.req, stats) ? '' : ' ※能力不足'}`] as [string, string]),
   ];
   const slotRow = (slot: EquipSlot, label: string, list: [string, string][], none: string, detail: string) => `
@@ -158,7 +160,10 @@ function render(): void {
     ${classPick}
     <section class="ed-sec">
       <div class="ed-h-row"><h2 class="ed-h">能力値</h2>
-        <span class="lv">Lv <b>${lo.level}</b>　<span class="${left ? 'pts' : 'dim'}">残り ${left} / ${budget}</span></span></div>
+        <span class="lv">Lv <b>${lo.level}</b>　<span class="${left ? 'pts' : 'dim'}">残り ${left}</span></span></div>
+      <div class="lvup"><span>ソウル <b>${c.souls}</b></span>
+        <span>${left > 0 ? '振れるポイントが残っています' : `次のレベル <b>${levelCost(lo.level)}</b> ソウル`}</span></div>
+      ${left === 0 ? `<p class="note">ポイントを振り切ったあとは、ソウルを払って＋を押すとレベルが上がります。${D.bought.length ? `この編集で${D.bought.length}レベル上げました（保存するまで取り消せます）。` : ''}</p>` : ''}
       ${c.lostLevels ? `<p class="note warn">底から脱出したため、レベルを${c.lostLevels}失っています（振れる上限が${c.lostLevels}減っています）。</p>` : ''}
       ${!isNew ? '<p class="note">保存済みの振り分けは下げられません。残りのポイントはいつでも振れます。</p>' : ''}
       <div class="st-list">${statRows}</div>
@@ -205,7 +210,24 @@ function onClick(ev: Event): void {
   const st = t.closest<HTMLButtonElement>('[data-stat]');
   if (st && !st.disabled) {
     const k = st.dataset.stat as StatKey;
-    c.alloc[k] += Number(st.dataset.d);
+    if (Number(st.dataset.d) > 0) {
+      // ポイントが残っていればそれを使い、なければソウルでレベルを買う
+      if (allocTotal(c.alloc) >= levelBudget(c)) {
+        if (!canBuyLevel(c)) return render();
+        D.c = { ...buyLevel(c), alloc: { ...c.alloc } };
+        D.bought.push(k);
+      }
+      D.c.alloc[k] += 1;
+    } else {
+      c.alloc[k] -= 1;
+      // この編集で買ったレベルなら払い戻す（最後に買ったものから）
+      const i = D.bought.lastIndexOf(k);
+      if (i >= 0) {
+        D.bought.splice(i, 1);
+        c.boughtLevels = (c.boughtLevels ?? 1) - 1;
+        c.souls += levelCost(charLevel(c));
+      }
+    }
     return render();
   }
 

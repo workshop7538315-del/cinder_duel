@@ -1,4 +1,4 @@
-import { charLevel, checkCharacter, drainedCopy, loadout, loseLevels, type Character } from '../character/model';
+import { charLevel, checkCharacter, loadout, loseLevels, type Character } from '../character/model';
 import { CARDS } from '../data/cards';
 import { CATACOMBS, type LootDef } from '../data/catacombs';
 import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
@@ -174,7 +174,6 @@ function renderRun(): void {
     <div class="ph"><span class="nm">${esc(c.name)} <small>Lv${lo.level}</small></span><span class="wt">持ち帰り予定 ソウル ${run.souls}</span></div>
     <div class="row"><span class="lbl">HP</span>${bar('hp', hp, maxHp)}<span class="num">${hp}/${maxHp}</span></div>
     <div class="row"><span class="lbl">FP</span>${bar('fp', fp, maxFp)}<span class="num">${fp}/${maxFp}</span></div>
-    ${run.drain ? `<p class="note warn">バジリスクにレベルを${run.drain}下げられている（この探索の間）。</p>` : ''}
     ${run.loot.length ? `<p class="note">拾ったもの：${run.loot.map((l) => {
       const safe = securedLoot({ ...run!, status: 'retreated' }).includes(l);
       return `<span class="${safe ? 'safe' : 'unsafe'}" title="${safe ? '退却しても持ち帰れる' : 'この階層の主を倒すまで、退却では持ち帰れない'}">${lootName(l)}${safe ? '✓' : ''}</span>`;
@@ -189,7 +188,7 @@ function renderRun(): void {
     const finalBoss = room.kind === 'boss' && run.floor === dungeon.floors.length - 1;
     action = `<div class="room-card rk-${room.kind}"><p class="eyebrow">${room.kind === 'boss' ? (finalBoss ? 'この地下墓の主' : `地下${run.floor + 1}層の主`) : '敵'}</p>
       <b>${esc(e.name)}</b><span>Lv${charLevel(e)}・${[loadout(e).right.name, loadout(e).left?.name].filter(Boolean).join('＋')}</span>
-      ${e.equip.right === 'basilisk_maw' ? `<p class="stain-note">呪いの息は回避しないと、呪死が溜まり（溜まりきると即死）、レベルが下がる。ガードはできない。</p>` : ''}
+      ${e.equip.right === 'basilisk_maw' ? `<p class="stain-note">呪いの息は回避しないと呪死が溜まり、溜まりきると即死する。呪死するとレベルを1失い、底を出ても戻らない。ガードはできない。</p>` : ''}
       ${stainHere(run) ? `<p class="stain-note">ここにあなたの血痕がある（ソウル ${stainHere(run)!.souls}）。この部屋の敵に勝てば取り戻せる。戦闘中に手番の初めの「ソウルを回収する」で先に取り戻しておけば、この戦いで倒れても失わない（ここに落とし直す）。回収しないまま倒れると失われる。</p>` : ''}
       <button type="button" class="btn primary big" data-run="fight">戦う</button></div>`;
   } else if (room.kind === 'chest') {
@@ -272,17 +271,23 @@ function fight(): void {
   let r = run;
   const stain = stainHere(r);
   const firstLoot = room.loot && !isLooted(r);
-  startBattle(drainedCopy(c, r.drain ?? 0), room.enemy!, (won, me) => {
-    const drain = (r.drain ?? 0) + (me.drained ?? 0);
+  startBattle(c, room.enemy!, (won, me) => {
+    // 呪死してレベルを失ったら、すぐにキャラへ反映する（脱出しても戻らない）
+    let lost = '';
+    if (me.drained) {
+      const now = charId ? findCharacter(charId) : undefined;
+      if (now) upsertCharacter(loseLevels(now, me.drained));
+      lost = `呪死により、レベルを${me.drained}失った。`;
+    }
     if (won) {
       if (room.clue) foundClue(room.clue);
       const gotLoot = firstLoot ? `「${lootName(room.loot!)}」を拾った。` : '';
       const gotStain = stainHere(r) ? `血痕のソウル ${stainHere(r)!.souls} を取り戻した。` : '';
-      step({ ...winBattle(d, r, me.hp, me.fp), drain }, `${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}${gotStain}`);
+      step(winBattle(d, r, me.hp, me.fp), `${lost}${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}${gotStain}`);
     } else {
       const prev = r.stain ? `前の血痕のソウル ${r.stain.souls} は失われた。` : '';
       const dropped = r.souls > 0 ? `ソウル ${r.souls} をこの部屋に落とした。` : '';
-      step({ ...loseBattle(r), drain }, `あなたは倒れた。${dropped}${prev}最初の部屋からやり直す。`);
+      step(loseBattle(r), `あなたは倒れた。${lost}${dropped}${prev}最初の部屋からやり直す。`);
     }
   }, {
     hp: r.hp, fp: r.fp, foeHpRatio: room.hpRatio,
