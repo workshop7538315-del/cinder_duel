@@ -1,5 +1,5 @@
 import {
-  allocTotal, autoDeck, cardBlock, checkCharacter, countCards, loadout, newCharacter,
+  allocTotal, autoDeck, levelBudget, cardBlock, checkCharacter, countCards, loadout, newCharacter,
   type Character, type EquipSlot,
 } from '../character/model';
 import { CARDS } from '../data/cards';
@@ -68,7 +68,8 @@ function render(): void {
   const lo = loadout(c);
   const cls = CLASSES[c.classId];
   const used = allocTotal(c.alloc);
-  const left = RULES.levelBudget - used;
+  const budget = levelBudget(c);
+  const left = budget - used;
   const issues = checkCharacter(c, { minAlloc: minAlloc ?? undefined });
 
   // 素性（新規のみ）
@@ -139,7 +140,7 @@ function render(): void {
     const block = cardBlock(id, stats, lo.schools, lo.right);
     const canAdd = !block && n < Math.min(RULES.copyLimit, have) && c.deck.length < RULES.deckMax;
     return `<div class="dk-row ${block ? 'blocked' : ''} ${n ? 'in' : ''}">
-      <div class="dk-main"><span class="dk-kind">${card.kind}</span><b>${card.name}</b> <span class="dk-cost">${costLabel(card.cost, card.fp)}</span>
+      <div class="dk-main"><span class="dk-kind">${card.kind}</span><b>${card.name}</b> <span class="dk-cost">${card.unplayable ? '捨てると発動' : costLabel(card.cost, card.fp)}</span>
         <p>${card.text(null)}${card.req ? `　<span class="dim">必要 ${reqLabel(card.req)}</span>` : ''}${block ? `　<b class="warn">${block}</b>` : ''}</p></div>
       <div class="dk-count">
         <button type="button" data-card="${id}" data-d="-1" aria-label="${card.name}を減らす" ${n ? '' : 'disabled'}>−</button>
@@ -157,7 +158,8 @@ function render(): void {
     ${classPick}
     <section class="ed-sec">
       <div class="ed-h-row"><h2 class="ed-h">能力値</h2>
-        <span class="lv">Lv <b>${lo.level}</b>　<span class="${left ? 'pts' : 'dim'}">残り ${left} / ${RULES.levelBudget}</span></span></div>
+        <span class="lv">Lv <b>${lo.level}</b>　<span class="${left ? 'pts' : 'dim'}">残り ${left} / ${budget}</span></span></div>
+      ${c.lostLevels ? `<p class="note warn">底から脱出したため、レベルを${c.lostLevels}失っています（振れる上限が${c.lostLevels}減っています）。</p>` : ''}
       ${!isNew ? '<p class="note">保存済みの振り分けは下げられません。残りのポイントはいつでも振れます。</p>' : ''}
       <div class="st-list">${statRows}</div>
     </section>

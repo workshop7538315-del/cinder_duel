@@ -44,6 +44,11 @@ export const RULES = {
   bleedDecay: 3, //    ラウンド開始時に減る量
   bleedGuardRatio: 0.5, // ガードしたときに溜まる割合（回避なら溜まらない）
 
+  // 呪死: 溜まりきると即死。回避すれば溜まらず、ガードで半分
+  curseThreshold: 12,
+  curseDecay: 2,
+  curseGuardRatio: 0.5,
+
   // カード効果
   flaskRatio: 0.3,
   oilBonus: 4,

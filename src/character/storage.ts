@@ -47,8 +47,9 @@ export function sanitizeCharacter(raw: unknown): Character | null {
     const n = Number(ra[k]);
     alloc[k] = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
   }
+  const lost = Math.max(0, Math.floor(Number(r.lostLevels) || 0));
   // 振れる上限を超えた不正なデータは振り直し扱いにする
-  if (STAT_ORDER.reduce((a, k) => a + alloc[k], 0) > RULES.levelBudget) for (const k of STAT_ORDER) alloc[k] = 0;
+  if (STAT_ORDER.reduce((a, k) => a + alloc[k], 0) > Math.max(0, RULES.levelBudget - lost)) for (const k of STAT_ORDER) alloc[k] = 0;
   const re = (r.equip ?? {}) as Record<string, unknown>;
   const equip = {} as Equip;
   for (const s of SLOTS) equip[s] = validItem(s, re[s]);
@@ -67,6 +68,7 @@ export function sanitizeCharacter(raw: unknown): Character | null {
     deck,
     inventory,
     souls: Number.isFinite(souls) && souls > 0 ? Math.floor(souls) : 0,
+    lostLevels: lost,
     clues: Array.isArray(r.clues) ? [...new Set(r.clues.filter((x): x is string => typeof x === 'string' && !!FIXED_CATACOMBS[x]))] : [],
     createdAt: typeof r.createdAt === 'number' ? r.createdAt : now,
     updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : now,

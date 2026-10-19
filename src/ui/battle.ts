@@ -10,7 +10,7 @@ import {
 } from '../game/battle';
 import { makeFighter, scaleHp } from '../game/setup';
 import { $, dieHTML, esc, show } from './dom';
-import { askCount, modal } from './modal';
+import { askCount, modal, pickCards } from './modal';
 
 let B: Battle | null = null;
 let sel = new Set<number>();
@@ -51,6 +51,8 @@ function panelHTML(b: Battle, f: Fighter): string {
   if (b.counter?.owner === f) chips.push(`<span class="chip turn">反撃の構え</span>`);
   if (f.buffs.broken) chips.push(`<span class="chip debuff">体勢崩し</span>`);
   if (f.bleed) chips.push(`<span class="chip debuff">出血 ${f.bleed}/${RULES.bleedThreshold}</span>`);
+  if (f.curse) chips.push(`<span class="chip debuff">呪死 ${f.curse}/${RULES.curseThreshold}</span>`);
+  if (f.drained) chips.push(`<span class="chip debuff">レベル -${f.drained}</span>`);
   const md = !f.isPlayer && f.action.length
     ? `<span class="minidice">${f.action.map((d) => dieHTML(d.v)).join('')}</span>` : '';
   const gear = [f.right.name, f.left?.name].filter(Boolean).join('＋');
@@ -126,7 +128,7 @@ function render(): void {
         const ok = !cardUnusable(p, id) && b.canPay(c.cost, c.fp ?? 0);
         return `<button type="button" class="card" data-card="${i}" ${ok ? '' : 'disabled'}>
           <span class="k">${c.kind}</span><span class="n">${c.name}</span>
-          <span class="c">${costLabel(c.cost, c.fp)}</span><span class="t">${c.text(p)}</span></button>`;
+          <span class="c">${c.unplayable ? '捨てると発動' : costLabel(c.cost, c.fp)}</span><span class="t">${c.text(p)}</span></button>`;
       }).join('')
     : '<span class="empty">手札なし</span>';
   $('#deckNote').textContent = `山札 ${p.deck.length}・捨て札 ${p.discard.length}`;
@@ -151,6 +153,7 @@ function reactHead(hit: IncomingHit): string {
   const o = hit.attack;
   return `<p class="eyebrow">リアクション</p><h3>${esc(hit.attacker.name)}の${o.label}</h3>
     <p class="incoming">${typeName(o.type)} <b>${hit.raw}</b>${o.unguardable ? '　ガード不可' : ''}</p>
+    ${o.curse || o.drain ? `<p class="stain-note">${o.curse ? `当たると呪死が${o.curse}溜まる（${RULES.curseThreshold}で即死。今 ${hit.attacker === B?.e ? B.p.curse ?? 0 : 0}）。` : ''}${o.drain ? '当たるとレベルが1下がる。' : ''}回避すれば防げる。</p>` : ''}
     <ul class="opts"><li>${hit.dodgeCost === null ? '過重のため回避できない' : `回避 [${hit.dodgeCost}] → 0ダメージ`}</li>
     <li>${o.unguardable ? 'ガードはできない' : `ガード [${hit.guardCost}] → ${hit.guardDmg}ダメージ（カット${Math.round(hit.guardCut * 100)}%）`}</li>
     ${hit.art ? `<li>戦技「${hit.art.name}」${costLabel(hit.art.cost, hit.art.fp)} → 回避して反撃の構え</li>` : ''}</ul>`;
@@ -207,6 +210,15 @@ const io: BattleIO = {
         <button type="button" data-v="take">受ける<small>${hit.raw}ダメージ</small></button>
       </div>`);
     return v as Reaction;
+  },
+
+  askDiscard(hand, min, max, cardName) {
+    return pickCards(
+      `「${cardName}」で捨てるカード`,
+      `${min === max ? `${min}枚` : `${min}〜${max}枚`}選んでください。捨てると発動するカードは、ここで発動します。`,
+      hand.map((id) => ({ name: CARDS[id].name, sub: CARDS[id].onDiscard ? `捨てると発動：${CARDS[id].onDiscard!.text}` : CARDS[id].kind })),
+      min, max,
+    );
   },
 
   async askCounter(info, max) {

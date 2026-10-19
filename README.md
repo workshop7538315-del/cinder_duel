@@ -27,6 +27,7 @@ npm run build    # dist/ に書き出し
 | `src/data/presets.ts` | 練習試合の相手（通常・強敵） |
 | `src/data/catacombs.ts` | 地下墓（敵・主・手に入るもの）と地下墓の数値 |
 | `src/data/fixed.ts` | 困難な地下墓（固定の間取り・特定のシード） |
+| `src/data/abyss.ts` | 底（バジリスク・盗掘者狩り・専用の物）と底の数値 |
 | `src/engine/` | 画面に依存しないルール処理（ダイス、コストの支払い、補正、ガード） |
 | `src/character/model.ts` | キャラクターのデータと検査（レベル、装備、デッキ） |
 | `src/character/storage.ts` | 保存・書き出し・読み込み（バージョン管理つき） |

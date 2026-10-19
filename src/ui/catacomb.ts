@@ -1,10 +1,12 @@
-import { charLevel, checkCharacter, loadout, type Character } from '../character/model';
+import { charLevel, checkCharacter, drainedCopy, loadout, loseLevels, type Character } from '../character/model';
 import { CARDS } from '../data/cards';
 import { CATACOMBS, type LootDef } from '../data/catacombs';
 import { ARMORS, SHIELDS, WEAPONS } from '../data/equipment';
+import { ABYSS } from '../data/abyss';
 import { FIXED_CATACOMBS } from '../data/fixed';
 import {
-  generateDungeon, normalizeSeed, rebuildDungeon, ROOM_NAMES, strayInto, versionedSeed, type Dungeon,
+  buildAbyss, fixedFromSeed, generateDungeon, normalizeSeed, pickAbyss, rebuildDungeon, ROOM_NAMES, strayInto, versionedSeed,
+  type Dungeon,
 } from '../dungeon/generate';
 import { randomSeed } from '../dungeon/rng';
 import {
@@ -117,10 +119,19 @@ function enter(): void {
     $('#dgBody').insertAdjacentHTML('afterbegin', `<p class="warn">${esc(e instanceof Error ? e.message : 'このシードでは入れません。')}</p>`);
     return;
   }
-  run = startRun(c.id, dungeon);
-  rememberSeed({ seed: s, catacombId: dungeon.catacombId, rooms: dungeon.totalRooms, at: Date.now() });
-  if (dungeon.rank === '困難') learnClue(c, dungeon.catacombId.slice(6));
-  notice = `${stray ? '道に迷い、' : ''}${dungeon.name}に入った。${dungeon.rank === '困難' ? '【困難】' : ''}${dungeon.floors.length}階層・全${dungeon.totalRooms}部屋。`;
+  // 困難な地下墓のシードを自分で入れたときは、入れるのはまれ。入りそこねると底に落ちる
+  const target = !stray ? fixedFromSeed(s) : null;
+  if (target && Math.random() >= ABYSS.fixedEntryChance) {
+    const key = pickAbyss();
+    dungeon = buildAbyss(key, randomSeed(), charLevel(c));
+    run = { ...startRun(c.id, dungeon), from: target };
+    notice = `「${FIXED_CATACOMBS[target].name}」への道を踏み外し、${dungeon.name}に落ちた。バジリスクの気配がする。盗掘者狩りを倒さずに脱出すると、レベルを${ABYSS.escapeLevelLoss}失う。`;
+  } else {
+    run = startRun(c.id, dungeon);
+    rememberSeed({ seed: s, catacombId: dungeon.catacombId, rooms: dungeon.totalRooms, at: Date.now() });
+    if (dungeon.rank === '困難') learnClue(c, dungeon.catacombId.slice(6));
+    notice = `${stray ? '道に迷い、' : target ? '道を見失わずに、' : ''}${dungeon.name}に入った。${dungeon.rank === '困難' ? '【困難】' : ''}${dungeon.floors.length}階層・全${dungeon.totalRooms}部屋。`;
+  }
   result = null;
   saveRun(run);
   show('run');
@@ -151,7 +162,7 @@ function renderRun(): void {
   const hp = run.hp ?? maxHp;
   const fp = run.fp ?? maxFp;
 
-  const head = `<div class="run-h"><div><p class="eyebrow">シード ${esc(dungeon.seed)}</p><h1 class="page-h">${dungeon.name}${dungeon.rank === '困難' ? ' <span class="rank">困難</span>' : ''}</h1></div>
+  const head = `<div class="run-h"><div><p class="eyebrow">シード ${esc(dungeon.seed)}</p><h1 class="page-h">${dungeon.name}${dungeon.rank !== '通常' ? ` <span class="rank">${dungeon.rank === '底' ? '高難度' : '困難'}</span>` : ''}</h1></div>
     <span class="lv">${Math.min(roomNumber(dungeon, run), dungeon.totalRooms)} / ${dungeon.totalRooms}部屋</span></div>`;
 
   if (result) {
@@ -163,6 +174,7 @@ function renderRun(): void {
     <div class="ph"><span class="nm">${esc(c.name)} <small>Lv${lo.level}</small></span><span class="wt">持ち帰り予定 ソウル ${run.souls}</span></div>
     <div class="row"><span class="lbl">HP</span>${bar('hp', hp, maxHp)}<span class="num">${hp}/${maxHp}</span></div>
     <div class="row"><span class="lbl">FP</span>${bar('fp', fp, maxFp)}<span class="num">${fp}/${maxFp}</span></div>
+    ${run.drain ? `<p class="note warn">バジリスクにレベルを${run.drain}下げられている（この探索の間）。</p>` : ''}
     ${run.loot.length ? `<p class="note">拾ったもの：${run.loot.map((l) => {
       const safe = securedLoot({ ...run!, status: 'retreated' }).includes(l);
       return `<span class="${safe ? 'safe' : 'unsafe'}" title="${safe ? '退却しても持ち帰れる' : 'この階層の主を倒すまで、退却では持ち帰れない'}">${lootName(l)}${safe ? '✓' : ''}</span>`;
@@ -177,6 +189,7 @@ function renderRun(): void {
     const finalBoss = room.kind === 'boss' && run.floor === dungeon.floors.length - 1;
     action = `<div class="room-card rk-${room.kind}"><p class="eyebrow">${room.kind === 'boss' ? (finalBoss ? 'この地下墓の主' : `地下${run.floor + 1}層の主`) : '敵'}</p>
       <b>${esc(e.name)}</b><span>Lv${charLevel(e)}・${[loadout(e).right.name, loadout(e).left?.name].filter(Boolean).join('＋')}</span>
+      ${e.equip.right === 'basilisk_maw' ? `<p class="stain-note">呪いの息は回避しないと、呪死が溜まり（溜まりきると即死）、レベルが下がる。ガードはできない。</p>` : ''}
       ${stainHere(run) ? `<p class="stain-note">ここにあなたの血痕がある（ソウル ${stainHere(run)!.souls}）。この部屋の敵に勝てば取り戻せる。戦闘中に手番の初めの「ソウルを回収する」で先に取り戻しておけば、この戦いで倒れても失わない（ここに落とし直す）。回収しないまま倒れると失われる。</p>` : ''}
       <button type="button" class="btn primary big" data-run="fight">戦う</button></div>`;
   } else if (room.kind === 'chest') {
@@ -197,8 +210,8 @@ function renderRun(): void {
   }
 
   const abandon = confirmAbandon
-    ? `<div class="row-btns"><button type="button" class="btn danger" data-run="abandon-yes">諦めて出る（何も持ち帰れない）</button><button type="button" class="btn" data-run="abandon-no">やめる</button></div>`
-    : `<button type="button" class="btn quiet" data-run="abandon">探索を諦める</button>`;
+    ? `<div class="row-btns"><button type="button" class="btn danger" data-run="abandon-yes">${dungeon.rank === '底' ? `脱出する（レベルを${ABYSS.escapeLevelLoss}失う）` : '諦めて出る（何も持ち帰れない）'}</button><button type="button" class="btn" data-run="abandon-no">やめる</button></div>`
+    : `<button type="button" class="btn quiet" data-run="abandon">${dungeon.rank === '底' ? '底から脱出する' : '探索を諦める'}</button>`;
 
   $('#runBody').innerHTML = `${head}
     ${notice ? `<p class="notice" role="status">${esc(notice)}</p>` : ''}
@@ -209,9 +222,10 @@ function renderRun(): void {
 }
 
 function resultHTML({ run: r, banked }: { run: RunState; banked: Banked }): string {
-  const title = r.status === 'cleared' ? '踏破' : r.status === 'retreated' ? '退却' : '探索を諦めた';
+  const abyss = r.catacombId.startsWith('abyss:');
+  const title = r.status === 'cleared' ? '踏破' : r.status === 'retreated' ? '退却' : abyss ? '脱出' : '探索を諦めた';
   const kept = r.status === 'abandoned'
-    ? `<p class="note">この探索で得たソウルと拾ったものは、すべて失われました。</p>`
+    ? `<p class="note">この探索で得たソウルと拾ったものは、すべて失われました。${abyss ? `レベルを${ABYSS.escapeLevelLoss}失いました。` : ''}</p>`
     : `<ul class="gains">
         <li>ソウル <b>+${banked.souls}</b></li>
         ${banked.items.map((id) => `<li>装備「${(WEAPONS[id] ?? SHIELDS[id] ?? ARMORS[id]).name}」を手に入れた</li>`).join('')}
@@ -230,6 +244,10 @@ function finish(next: RunState): void {
   if (!c) return onBack();
   const { character, banked } = bankRun(c, next);
   if (next.status === 'cleared' || next.status === 'retreated') upsertCharacter(character);
+  if (next.status === 'abandoned' && next.catacombId.startsWith('abyss:')) {
+    upsertCharacter(loseLevels(c, ABYSS.escapeLevelLoss));
+    notice = `底から脱出した。代償にレベルを${ABYSS.escapeLevelLoss}失った。`;
+  }
   result = { run: next, banked };
   show('run');
   renderRun();
@@ -254,16 +272,17 @@ function fight(): void {
   let r = run;
   const stain = stainHere(r);
   const firstLoot = room.loot && !isLooted(r);
-  startBattle(c, room.enemy!, (won, me) => {
+  startBattle(drainedCopy(c, r.drain ?? 0), room.enemy!, (won, me) => {
+    const drain = (r.drain ?? 0) + (me.drained ?? 0);
     if (won) {
       if (room.clue) foundClue(room.clue);
       const gotLoot = firstLoot ? `「${lootName(room.loot!)}」を拾った。` : '';
       const gotStain = stainHere(r) ? `血痕のソウル ${stainHere(r)!.souls} を取り戻した。` : '';
-      step(winBattle(d, r, me.hp, me.fp), `${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}${gotStain}`);
+      step({ ...winBattle(d, r, me.hp, me.fp), drain }, `${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}${gotStain}`);
     } else {
       const prev = r.stain ? `前の血痕のソウル ${r.stain.souls} は失われた。` : '';
       const dropped = r.souls > 0 ? `ソウル ${r.souls} をこの部屋に落とした。` : '';
-      step(loseBattle(r), `あなたは倒れた。${dropped}${prev}最初の部屋からやり直す。`);
+      step({ ...loseBattle(r), drain }, `あなたは倒れた。${dropped}${prev}最初の部屋からやり直す。`);
     }
   }, {
     hp: r.hp, fp: r.fp, foeHpRatio: room.hpRatio,

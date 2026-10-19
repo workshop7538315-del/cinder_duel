@@ -1,7 +1,9 @@
 import { RULES } from '../data/rules';
 import { shuffle } from './dice';
 import { scaled } from './scaling';
-import type { DamageType, Die, Fighter, School, Scaling, Weapon } from './types';
+import { STAT_ORDER } from '../data/classes';
+import { derive, meetsReq } from './stats';
+import type { DamageType, Die, Fighter, School, Scaling, StatKey, Weapon } from './types';
 
 /** 武器攻撃・戦技のダメージ。装備条件を満たさないと基礎値に倍率が掛かり、補正もなくなる。 */
 export function weaponDamage(f: Fighter, s: Scaling): number {
@@ -24,6 +26,33 @@ export function addBleed(f: Fighter, amount: number): number {
   if (f.bleed < RULES.bleedThreshold) return 0;
   f.bleed = 0;
   return Math.round(f.maxHp * RULES.bleedBurstRatio) + RULES.bleedBurstBase;
+}
+
+/** 呪死を溜める。溜まりきったら true（即死） */
+export function addCurse(f: Fighter, amount: number): boolean {
+  if (amount <= 0) return false;
+  f.curse = (f.curse ?? 0) + amount;
+  if (f.curse < RULES.curseThreshold) return false;
+  f.curse = 0;
+  return true;
+}
+
+/** レベルを1下げる（いちばん高い能力値を1減らし、HPなどを計算し直す）。下げた能力値を返す */
+export function drainLevel(f: Fighter): StatKey {
+  const k = STAT_ORDER.reduce((a, b) => (f.stats[b] > f.stats[a] ? b : a));
+  f.stats = { ...f.stats, [k]: Math.max(1, f.stats[k] - 1) };
+  const d = derive(f.stats);
+  f.maxHp = d.maxHp;
+  f.hp = Math.min(f.hp, f.maxHp);
+  f.maxFp = d.maxFp;
+  f.fp = Math.min(f.fp, f.maxFp);
+  f.stMax = d.stMax;
+  f.stamina = Math.min(f.stamina, f.stMax);
+  f.rightOk = meetsReq(f.right.req, f.stats);
+  f.leftOk = f.left ? meetsReq(f.left.req, f.stats) : true;
+  f.level -= 1;
+  f.drained = (f.drained ?? 0) + 1;
+  return k;
 }
 
 /** その系統の触媒を持っていれば、その触媒（右手優先） */

@@ -68,3 +68,34 @@ export function askCount({ head = '', title = '', text = '', max, def, btn, alt,
     M.querySelector<HTMLButtonElement>('[data-go]:not(:disabled), [data-extra]')?.focus();
   });
 }
+
+/** 手札から捨てるカードを選ぶ。選んだ添字を返す */
+export function pickCards(title: string, note: string, cards: { name: string; sub: string }[], min: number, max: number): Promise<number[]> {
+  return new Promise((res) => {
+    const M = root();
+    const picked = new Set<number>();
+    const draw = () => {
+      const ok = picked.size >= min && picked.size <= max;
+      M.innerHTML = `<div class="sheet"><h3>${title}</h3><p class="note">${note}</p>
+        <div class="pick-list">${cards.map((c, i) => `
+          <button type="button" class="pick ${picked.has(i) ? 'on' : ''}" data-pick="${i}" aria-pressed="${picked.has(i)}">
+            <b>${c.name}</b><small>${c.sub}</small></button>`).join('')}</div>
+        <div class="btns"><button type="button" class="primary" data-ok ${ok ? '' : 'disabled'}>${picked.size}枚捨てる</button></div></div>`;
+    };
+    draw();
+    M.hidden = false;
+    M.onclick = (e) => {
+      const b = (e.target as HTMLElement).closest<HTMLButtonElement>('button');
+      if (!b || b.disabled) return;
+      if (b.dataset.pick !== undefined) {
+        const i = Number(b.dataset.pick);
+        if (picked.has(i)) picked.delete(i);
+        else if (picked.size < max) picked.add(i);
+        draw();
+      } else if ('ok' in b.dataset) {
+        close();
+        res([...picked]);
+      }
+    };
+  });
+}

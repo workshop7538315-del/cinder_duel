@@ -89,6 +89,16 @@ export const WEAPONS: Record<string, Weapon> = {
       dmg: { base: 10, scale: { str: 0.3, arc: 0.4 } }, bleed: { base: 6, scale: { arc: 0.2 } } },
   },
 
+  // ---- 敵だけが使う ----
+  basilisk_maw: {
+    kind: 'weapon', name: 'バジリスクの顎', weight: 0, req: {}, natural: true, noEnchant: true,
+    first: 3, inc: 3, maxChain: 2, type: 'phys',
+    dmg: { base: 6, scale: { str: 0.3 } }, cut: { phys: 0.2, magic: 0.2, holy: 0.2 },
+    // 回避しないと呪死が溜まり（12で即死）、当たるたびにレベルが下がる
+    art: { name: '呪いの息', cost: { t: 'sum', n: 3 }, fp: 4, type: 'magic', unguardable: true, curse: 7, drain: true,
+      dmg: { base: 5, scale: { arc: 0.2 } } },
+  },
+
   // ---- 触媒 ----
   novice_staff: {
     kind: 'catalyst', school: 'sorcery', name: '見習いの杖', weight: 2, req: { int: 10 },
@@ -114,6 +124,31 @@ export const WEAPONS: Record<string, Weapon> = {
     dmg: { base: 2, scale: { str: 0.1 } }, cut: { phys: 0.1, magic: 0.1, holy: 0.25 },
     // 信仰はほとんど効かず、神秘が主。筋力と技量も少し乗る
     power: { base: 0, scale: { fai: 0.1, arc: 0.5, str: 0.1, dex: 0.1 } },
+  },
+  // ---- 底の杖（底の魔術と相性がよい） ----
+  deep_staff: {
+    kind: 'catalyst', school: 'sorcery', name: '地底の杖', weight: 4, req: { str: 12, int: 16 },
+    first: 3, inc: 2, maxChain: 1, type: 'phys',
+    dmg: { base: 5, scale: { str: 0.25 } }, cut: { phys: 0.25, magic: 0.3, holy: 0.1 },
+    power: { base: 0, scale: { int: 0.55, str: 0.15 } },
+  },
+  hull_staff: {
+    kind: 'catalyst', school: 'sorcery', name: '船底の杖', weight: 3, req: { int: 14, arc: 10 },
+    first: 3, inc: 2, maxChain: 1, type: 'phys',
+    dmg: { base: 3, scale: { str: 0.1 } }, cut: { phys: 0.15, magic: 0.35, holy: 0.1 },
+    power: { base: 0, scale: { int: 0.5, arc: 0.2 } },
+  },
+  gorge_staff: {
+    kind: 'catalyst', school: 'sorcery', name: '谷底の杖', weight: 2.5, req: { dex: 12, int: 16 },
+    first: 3, inc: 2, maxChain: 1, type: 'phys',
+    dmg: { base: 3, scale: { dex: 0.2 } }, cut: { phys: 0.15, magic: 0.3, holy: 0.1 },
+    power: { base: 0, scale: { int: 0.55, dex: 0.15 } },
+  },
+  lake_staff: {
+    kind: 'catalyst', school: 'sorcery', name: '湖底の杖', weight: 3, req: { int: 14, fai: 10 },
+    first: 3, inc: 2, maxChain: 1, type: 'phys',
+    dmg: { base: 3, scale: { str: 0.1 } }, cut: { phys: 0.15, magic: 0.4, holy: 0.25 },
+    power: { base: 0, scale: { int: 0.5, fai: 0.2 } },
   },
   old_talisman: {
     kind: 'catalyst', school: 'incant', name: '古びたタリスマン', weight: 0.5, req: { fai: 18 },

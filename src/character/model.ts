@@ -32,6 +32,8 @@ export interface Character {
   souls: number;
   /** 知っている困難な地下墓（FIXED_CATACOMBS のキー）。手がかりで覚える */
   clues?: string[];
+  /** 失ったレベル（底から脱出したときなど）。この分だけ振れるレベルが減る */
+  lostLevels?: number;
   createdAt: number;
   updatedAt: number;
 }
@@ -180,9 +182,35 @@ export function newCharacter(classId: string, name?: string): Character {
   return {
     id: newId(), name: name ?? cls.name, classId,
     alloc: zeroStats(), equip: { ...cls.equip }, deck: deckFromCounts(inventory.cards),
-    inventory, souls: 0, clues: [], createdAt: now, updatedAt: now,
+    inventory, souls: 0, clues: [], lostLevels: 0, createdAt: now, updatedAt: now,
   };
 }
+
+/** 振れるレベルの上限（失ったレベルの分だけ減る） */
+export const levelBudget = (c: Pick<Character, 'lostLevels'>): number => Math.max(0, RULES.levelBudget - (c.lostLevels ?? 0));
+
+/** いちばん高い能力値（振った分があるもの）から n だけ下げる */
+function reduceAlloc(c: Character, n: number, allowNegative: boolean): Stats {
+  const alloc = { ...c.alloc };
+  for (let i = 0; i < n; i++) {
+    const stats = charStats({ classId: c.classId, alloc });
+    const pool = STAT_ORDER.filter((k) => allowNegative || alloc[k] > 0);
+    if (!pool.length) break;
+    const k = pool.reduce((a, b) => (stats[b] > stats[a] ? b : a));
+    alloc[k] -= 1;
+  }
+  return alloc;
+}
+
+/** レベルを失う（振った能力値が高いものから減り、振れる上限も減る） */
+export function loseLevels(c: Character, n: number): Character {
+  const lostLevels = (c.lostLevels ?? 0) + n;
+  const over = Math.max(0, allocTotal(c.alloc) - Math.max(0, RULES.levelBudget - lostLevels));
+  return { ...c, lostLevels, alloc: reduceAlloc(c, over, false), updatedAt: Date.now() };
+}
+
+/** 一時的にレベルを下げたキャラ（底でバジリスクに下げられた分）。保存しない */
+export const drainedCopy = (c: Character, n: number): Character => (n > 0 ? { ...c, alloc: reduceAlloc(c, n, true) } : c);
 
 export interface Issues {
   /** 保存できない問題 */
@@ -206,7 +234,7 @@ export function checkCharacter(c: Character, opts: CheckOptions = {}): Issues {
   if (!c.name.trim()) errors.push('名前を入れてください。');
 
   const total = allocTotal(c.alloc);
-  if (!ignoreBudget && total > RULES.levelBudget) errors.push(`振れるのは${RULES.levelBudget}レベルまでです（今は${total}）。`);
+  if (!ignoreBudget && total > levelBudget(c)) errors.push(`振れるのは${levelBudget(c)}レベルまでです（今は${total}）。`);
   const stats = charStats(c);
   for (const k of STAT_ORDER) {
     if (c.alloc[k] < 0) errors.push(`${STAT_NAMES[k]}は素性の初期値より下げられません。`);

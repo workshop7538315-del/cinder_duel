@@ -52,6 +52,10 @@ export interface WeaponArt {
   unguardable?: boolean;
   /** 出血の蓄積 */
   bleed?: Scaling;
+  /** 呪死の蓄積（溜まりきると即死） */
+  curse?: number;
+  /** 当たると相手のレベルを1下げる */
+  drain?: boolean;
   /** あると、自分の手番には使えないリアクション専用の戦技になる。
    *  回避として使い、そのあと相手が攻撃以外の行動をしたら counterCost を追加で払って反撃できる */
   reaction?: { counterCost: Cost };
@@ -78,6 +82,10 @@ export interface Weapon extends ItemBase {
   bleed?: Scaling;
   /** エンチャント（焼き油・刃の祝福など）を受け付けない */
   noEnchant?: boolean;
+  /** 呪死の蓄積（バジリスクなど） */
+  curse?: number;
+  /** 地下墓で手に入らない、敵だけが使う武器 */
+  natural?: boolean;
   art?: WeaponArt;
   /** 触媒のみ: 対応する系統と、魔術・祈祷に上乗せする威力 */
   school?: School;
@@ -148,6 +156,10 @@ export interface Fighter {
   chain: number;
   /** 溜まっている出血。上限に達すると弾けてダメージ */
   bleed: number;
+  /** 溜まっている呪死。上限に達すると即死 */
+  curse?: number;
+  /** この探索で下げられたレベル */
+  drained?: number;
   buffs: Buffs;
 }
 
@@ -160,6 +172,10 @@ export interface Attack {
   unguardable?: boolean;
   /** 当たったときに溜まる出血 */
   bleed?: number;
+  /** 当たったときに溜まる呪死 */
+  curse?: number;
+  /** 当たると相手のレベルを1下げる */
+  drain?: boolean;
   /** 反撃など、受け手がリアクションできない攻撃 */
   noReaction?: boolean;
   onHit?: (target: Fighter) => void;
