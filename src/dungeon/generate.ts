@@ -82,19 +82,23 @@ export function buildCatacomb(catacombId: string, seed: string, level: number): 
   const floors: Room[][] = counts.map((n, fi) => {
     const rooms: Room[] = [];
     const lastFloor = fi === floorCount - 1;
+    // 各階層の最後は主。途中の階層は、主のあとに篝火（次の階層への入口）がある
+    const bossAt = lastFloor ? n - 1 : n - 2;
     for (let ri = 0; ri < n; ri++) {
-      const last = ri === n - 1;
       let kind: RoomKind;
-      if (last) kind = lastFloor ? 'boss' : 'bonfire';
+      if (ri === bossAt) kind = 'boss';
+      else if (ri > bossAt) kind = 'bonfire';
       else if (ri === 0) kind = 'battle';
       else {
         kind = pickWeighted(r, DUNGEON.roomWeights);
-        if (kind === 'bonfire' && (rooms[ri - 1]?.kind === 'bonfire' || ri === n - 2)) kind = 'battle';
+        if (kind === 'bonfire' && rooms[ri - 1]?.kind === 'bonfire') kind = 'battle';
       }
 
       if (kind === 'battle' || kind === 'boss') {
         const boss = kind === 'boss';
-        const def = boss ? cat.boss : pick(r, cat.enemies);
+        // 最後の階層の主はその地下墓の主。途中の階層の主は、道中の敵の強い個体
+        const base = boss && lastFloor ? cat.boss : pick(r, cat.enemies);
+        const def = boss && !lastFloor ? { ...base, name: `${base.name}（地下${fi + 1}層の主）` } : base;
         const lv = Math.max(1, boss
           ? level + DUNGEON.bossLevelOffset + fi * DUNGEON.enemyFloorStep
           : level + DUNGEON.enemyLevelOffset + fi * DUNGEON.enemyFloorStep + ri * DUNGEON.enemyRoomStep);
@@ -102,8 +106,8 @@ export function buildCatacomb(catacombId: string, seed: string, level: number): 
         rooms.push({
           kind,
           enemy: buildEnemy(def, lv, `${catacombId}:${seed}:${fi}:${ri}`),
-          hpRatio: boss ? DUNGEON.bossHpRatio : DUNGEON.enemyHpRatio,
-          souls: enemySouls(lv) * (boss ? DUNGEON.bossMult : 1),
+          hpRatio: boss ? (lastFloor ? DUNGEON.bossHpRatio : DUNGEON.floorBossHpRatio) : DUNGEON.enemyHpRatio,
+          souls: enemySouls(lv) * (boss ? (lastFloor ? DUNGEON.bossMult : DUNGEON.floorBossMult) : 1),
           loot: drop,
         });
       } else if (kind === 'chest') {

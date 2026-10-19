@@ -25,8 +25,11 @@ export interface RunState {
   hp: number | null;
   fp: number | null;
   souls: number;
-  loot: LootDef[];
+  /** 拾ったもの（floor は拾った階層） */
+  loot: (LootDef & { floor?: number })[];
   status: RunStatus;
+  /** 主を倒した階層。退却したとき、ここで拾ったものだけ持ち帰れる（倒れても消えない） */
+  bossDown?: number[];
   /** 落としたソウル（なければ null） */
   stain?: Bloodstain | null;
   /** 宝箱を開けた・落とし物を拾った部屋（"階層:部屋"）。やり直しても二度は手に入らない */
@@ -65,7 +68,7 @@ function gain(run: RunState, room: Room, souls: boolean): RunState {
   return {
     ...run,
     souls: run.souls + (souls ? room.souls : 0),
-    loot: room.loot && first ? [...run.loot, room.loot] : run.loot,
+    loot: room.loot && first ? [...run.loot, { ...room.loot, floor: run.floor }] : run.loot,
     looted: first && (room.loot || room.kind === 'chest') ? [...(run.looted ?? []), roomKey(run)] : run.looted ?? [],
   };
 }
@@ -86,15 +89,23 @@ export function retrieveStain(run: RunState): RunState {
   return s ? { ...run, souls: run.souls + s.souls, stain: null } : run;
 }
 
+/** 戦闘に勝った。血痕のある部屋なら、回収していなくても勝てば拾える */
 export function winBattle(d: Dungeon, run: RunState, hp: number, fp: number): RunState {
   const room = currentRoom(d, run)!;
-  // 血痕のある部屋で回収しないまま勝つと、そのソウルは失われる
-  const next = { ...gain(run, room, true), hp, fp, stain: stainHere(run) ? null : run.stain ?? null };
+  const next = { ...gain(retrieveStain(run), room, true), hp, fp };
   if (room.kind === 'boss') {
-    return { ...next, souls: next.souls + d.totalRooms * DUNGEON.clearBonusPerRoom, status: 'cleared' };
+    const bossDown = [...new Set([...(run.bossDown ?? []), run.floor])];
+    if (run.floor === d.floors.length - 1) {
+      return { ...next, bossDown, souls: next.souls + d.totalRooms * DUNGEON.clearBonusPerRoom, status: 'cleared' };
+    }
+    return advance(d, { ...next, bossDown });
   }
   return advance(d, next);
 }
+
+/** 退却したときに持ち帰れる拾得物（主を倒した階層のもの） */
+export const securedLoot = (run: RunState): RunState['loot'] =>
+  run.status === 'cleared' ? run.loot : run.loot.filter((l) => (run.bossDown ?? []).includes(l.floor ?? 0));
 
 /** 倒れた。持っていたソウルはこの部屋に落ち（前の血痕は消える）、最初の部屋からやり直す */
 export function loseBattle(run: RunState): RunState {
@@ -114,7 +125,7 @@ export const rest = (run: RunState): RunState => ({ ...run, hp: null, fp: null }
 /** 篝火から先へ進む */
 export const leaveBonfire = (d: Dungeon, run: RunState): RunState => advance(d, run);
 
-/** 篝火から退却する（手に入れたものを持ち帰る） */
+/** 篝火から退却する（ソウルと、主を倒した階層で拾ったものを持ち帰る） */
 export const retreat = (run: RunState): RunState => ({ ...run, status: 'retreated' });
 
 export interface Banked {
@@ -123,16 +134,20 @@ export interface Banked {
   cards: string[];
   /** すでに持っていたのでソウルに替えた装備 */
   dupes: string[];
+  /** 主を倒していない階層で拾ったので、置いてきたもの */
+  left: LootDef[];
 }
 
 /** 持ち帰ったものをキャラに加える（踏破・退却のときだけ） */
 export function bankRun(c: Character, run: RunState): { character: Character; banked: Banked } {
-  const banked: Banked = { souls: 0, items: [], cards: [], dupes: [] };
+  const banked: Banked = { souls: 0, items: [], cards: [], dupes: [], left: [] };
   if (run.status !== 'cleared' && run.status !== 'retreated') return { character: c, banked };
   const items = [...c.inventory.items];
   const cards = { ...c.inventory.cards };
   let souls = run.souls;
-  for (const l of run.loot) {
+  const secured = securedLoot(run);
+  banked.left = run.loot.filter((l) => !secured.includes(l));
+  for (const l of secured) {
     if (l.kind === 'card') {
       cards[l.id] = (cards[l.id] ?? 0) + 1;
       banked.cards.push(l.id);

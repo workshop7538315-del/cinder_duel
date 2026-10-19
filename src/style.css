@@ -272,6 +272,8 @@ button.die{padding:7px}
 .btns button small{color:var(--muted);font-size:12px}
 .btns button.special{flex-direction:column;align-items:flex-start;background:#2c1517;border-color:var(--blood)}
 .btns button.special small{text-align:left}
+.safe{color:#b4cc9e}
+.unsafe{color:var(--muted)}
 .stain-note{margin:2px 0;padding:8px 10px;border-left:3px solid var(--blood);background:#241416;font-size:12.5px;color:#e8c4c1}
 .rm.stain{position:relative;border-color:var(--blood)}
 .rm.stain i{position:absolute;top:-4px;right:-4px;width:9px;height:9px;border-radius:50%;background:var(--blood);box-shadow:0 0 0 2px var(--panel)}
