@@ -88,3 +88,30 @@ describe('回避のコスト', () => {
     expect(dodgeBand(80)).toBeGreaterThan(dodgeBand(10));
   });
 });
+
+describe('リアクションの出目をためる', () => {
+  it('使わなかった出目は次のリアクションに使え、相手の手番が終わるとスタミナに戻る', async () => {
+    const { makeFighter } = await import('../src/game/setup');
+    const { newCharacter } = await import('../src/character/model');
+    const { Battle } = await import('../src/game/battle');
+    const io = {
+      log: () => {}, update: () => {}, flash: () => {}, wait: () => Promise.resolve(), finished: () => {},
+      askReactDice: async () => 0, askReactChoice: async () => 'dodge',
+    } as unknown as import('../src/game/battle').BattleIO;
+    const p = makeFighter(newCharacter('samurai'), true);
+    const e = makeFighter(newCharacter('wretch'), false);
+    const b = new Battle(p, e, io);
+    p.stamina = 0;
+    p.reactPool = [{ id: 901, v: 6 }, { id: 902, v: 6 }, { id: 903, v: 1 }];
+    const hp = p.hp;
+    await b.strike(e, p, { label: 'a', dmg: 3, type: 'phys' });
+    expect(p.hp).toBe(hp);
+    expect(p.reactPool.map((d) => d.v).sort()).toEqual([1, 6]);
+    await b.strike(e, p, { label: 'b', dmg: 3, type: 'phys' });
+    expect(p.hp).toBe(hp);
+    expect(p.reactPool.map((d) => d.v)).toEqual([1]);
+    (b as unknown as { returnPool(f: typeof p): void }).returnPool(p);
+    expect(p.reactPool).toEqual([]);
+    expect(p.stamina).toBe(1);
+  });
+});

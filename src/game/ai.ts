@@ -2,7 +2,7 @@ import { CARDS } from '../data/cards';
 import { findPayment, stageCost } from '../engine/cost';
 import { chance } from '../engine/dice';
 import { spend } from '../engine/fighter';
-import type { Fighter } from '../engine/types';
+import type { Die, Fighter } from '../engine/types';
 import { cardUnusable, type Battle, type IncomingHit, type Reaction } from './battle';
 
 /** ラウンド開始時にカードを引くか */
@@ -67,8 +67,12 @@ export function npcDiscards(hand: string[], min: number, max: number): number[] 
 }
 
 /** リアクションで振る個数（0 = 受ける） */
-export function npcReactDice(def: Fighter, hit: IncomingHit): number {
-  if (hit.raw <= 4) return 0;
+export function npcReactDice(def: Fighter, hit: IncomingHit, pool: Die[] = []): number {
+  if (hit.raw <= 4) return pool.length ? -1 : 0;
+  // ためてある出目で回避かガードができるなら、追加で振らない
+  const canNow = (hit.dodgeCost !== null && findPayment(pool, { t: 'sum', n: hit.dodgeCost }))
+    || (!hit.attack.unguardable && findPayment(pool, { t: 'sum', n: hit.guardCost }));
+  if (canNow) return 0;
   // スタミナが少ないときは、命に関わる攻撃でなければ受けて、自分の手番のために残す
   const dangerous = hit.raw >= def.hp || hit.raw >= def.maxHp * 0.2;
   if (!dangerous && def.stamina <= 3) return 0;

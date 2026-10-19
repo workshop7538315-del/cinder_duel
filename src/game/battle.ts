@@ -46,13 +46,13 @@ export interface BattleIO {
   askDraw(): Promise<boolean>;
   /** 手番開始時に振る個数。special を渡したときは、それを選ぶと 'special' が返る */
   askTurnDice(max: number, suggested: number, special?: SpecialAction): Promise<number | 'special'>;
-  /** リアクションで振る個数（0 = 振らずに受ける。max が 0 なら受けるしかない） */
-  askReactDice(hit: IncomingHit, max: number): Promise<number>;
+  /** リアクションで追加で振る個数。-1 = 受ける。pool（ためてある出目）が空なら 0 も受ける。max が 0 で pool も空なら受けるしかない */
+  askReactDice(hit: IncomingHit, max: number, pool: Die[]): Promise<number>;
   askReactChoice(hit: IncomingHit, dice: Die[], canDodge: boolean, canGuard: boolean, canArt: boolean): Promise<Reaction>;
   /** 手札から捨てるカードを選ぶ（hand の添字を返す） */
   askDiscard(hand: string[], min: number, max: number, cardName: string): Promise<number[]>;
-  /** 反撃の好機に振る個数（0 = 見送る） */
-  askCounter(info: CounterInfo, max: number): Promise<number>;
+  /** 反撃の好機に追加で振る個数（-1 = 見送る。ためてある出目 pool も使える） */
+  askCounter(info: CounterInfo, max: number, pool: Die[]): Promise<number>;
   finished(playerWon: boolean): void;
 }
 
@@ -194,6 +194,8 @@ export class Battle {
     f.action = [];
     f.chain = 0;
     f.buffs.enchant = undefined;
+    // 相手の手番が終わったので、ためてあった出目はスタミナダイスに戻る
+    this.returnPool(o);
     this.turn = null;
     if (!this.over) {
       this.phase = 'wait';
@@ -223,6 +225,17 @@ export class Battle {
     this.endTurnResolve = null;
   }
 
+  /** リアクション用にためてあった出目を、スタミナダイスに戻す */
+  private returnPool(f: Fighter): void {
+    const n = f.reactPool?.length ?? 0;
+    f.reactPool = [];
+    if (!n) return;
+    const before = f.stamina;
+    f.stamina = Math.min(f.stMax, f.stamina + n);
+    if (f.stamina > before) this.log(`${this.who(f)}は使わなかった出目${f.stamina - before}個をスタミナダイスに戻した。`, this.side(f));
+    this.update();
+  }
+
   /** スタミナダイスをまとめて振って行動ダイスにする */
   rollAction(f: Fighter, k: number): void {
     k = Math.max(0, Math.min(k, f.stamina));
@@ -244,18 +257,27 @@ export class Battle {
   private async resolveCounter(c: CounterInfo): Promise<void> {
     const { owner, target, art } = c;
     this.log(`${this.who(target)}の隙に、${this.who(owner)}は反撃を狙う。`, this.side(owner));
-    if (owner.stamina === 0) {
+    const pool = (owner.reactPool ??= []);
+    if (owner.stamina === 0 && !pool.length) {
       this.log(`スタミナダイスがなく、反撃できなかった。`);
       return;
     }
-    const k = owner.isPlayer ? await this.io.askCounter(c, owner.stamina) : Math.min(owner.stamina, 3);
-    if (k <= 0) {
+    const k = owner.isPlayer ? await this.io.askCounter(c, owner.stamina, pool)
+      : findPayment(pool, c.cost) ? 0 : Math.min(owner.stamina, 3);
+    if (k < 0 || (k === 0 && !pool.length)) {
       this.log(`${this.who(owner)}は反撃を見送った。`);
       return;
     }
-    this.rollAction(owner, k);
+    if (k > 0) {
+      const n = Math.min(k, owner.stamina);
+      owner.stamina -= n;
+      const fresh = rollDice(n);
+      pool.push(...fresh);
+      this.log(`${this.who(owner)}はスタミナダイスを${n}個振った：${fresh.map((d) => d.v).join('・')}`, this.side(owner));
+    }
     this.update();
-    const pay = findPayment(owner.action, c.cost);
+    const pay = findPayment(pool, c.cost);
+    owner.reactPool = pay ? pool.filter((d) => !pay.includes(d)) : pool;
     owner.action = [];
     if (!pay) {
       this.log(`出目が足りず、反撃できなかった。`);
@@ -420,24 +442,35 @@ export class Battle {
       await this.wait(400);
       return patternReact(def, hit);
     }
-    if (def.stamina === 0) {
-      if (def.isPlayer) await this.io.askReactDice(hit, 0);
+    // 前のリアクションで使わなかった出目（ためてある）
+    const pool = (def.reactPool ??= []);
+    if (def.stamina === 0 && !pool.length) {
+      if (def.isPlayer) await this.io.askReactDice(hit, 0, pool);
       return 'take';
     }
-    const k = def.isPlayer ? await this.io.askReactDice(hit, def.stamina) : npcReactDice(def, hit);
-    if (k <= 0) return 'take';
-    this.rollAction(def, k);
+    const k = def.isPlayer ? await this.io.askReactDice(hit, def.stamina, pool) : npcReactDice(def, hit, pool);
+    if (k < 0 || (k === 0 && !pool.length)) return 'take';
+    if (k > 0) {
+      const n = Math.min(k, def.stamina);
+      def.stamina -= n;
+      const fresh = rollDice(n);
+      pool.push(...fresh);
+      this.log(`${this.who(def)}はスタミナダイスを${n}個振った：${fresh.map((d) => d.v).join('・')}${pool.length > n ? `（ためてある出目と合わせて ${pool.map((d) => d.v).join('・')}）` : ''}`, this.side(def));
+    }
+    def.action = pool;
     this.update();
-    const canDodge = hit.dodgeCost !== null && !!findPayment(def.action, { t: 'sum', n: hit.dodgeCost });
-    const canGuard = !hit.attack.unguardable && !!findPayment(def.action, { t: 'sum', n: hit.guardCost });
-    const canArt = !!hit.art && !!findPayment(def.action, hit.art.cost);
+    const dodgePay = hit.dodgeCost !== null ? findPayment(pool, { t: 'sum', n: hit.dodgeCost }) : null;
+    const guardPay = !hit.attack.unguardable ? findPayment(pool, { t: 'sum', n: hit.guardCost }) : null;
+    const artPay = hit.art ? findPayment(pool, hit.art.cost) : null;
     let r: Reaction;
-    if (def.isPlayer) r = await this.io.askReactChoice(hit, def.action, canDodge, canGuard, canArt);
+    if (def.isPlayer) r = await this.io.askReactChoice(hit, pool, !!dodgePay, !!guardPay, !!artPay);
     else {
       await this.wait(600);
-      r = npcReactChoice(canDodge, canGuard, canArt);
+      r = npcReactChoice(!!dodgePay, !!guardPay, !!artPay);
     }
-    // 使わなかった分も含め、リアクションの行動ダイスは消える
+    // 払った出目だけ消え、残りは次のリアクションのためにためておく（相手の手番が終わるとスタミナに戻る）
+    const pay = r === 'dodge' ? dodgePay : r === 'guard' ? guardPay : r === 'art' ? artPay : null;
+    def.reactPool = pay ? pool.filter((d) => !pay.includes(d)) : pool;
     def.action = [];
     this.update();
     return r;
