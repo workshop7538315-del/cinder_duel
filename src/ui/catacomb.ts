@@ -10,11 +10,11 @@ import { ABYSS } from '../data/abyss';
 import { FIXED_CATACOMBS } from '../data/fixed';
 import {
   abyssBaseLevel, abyssFromSeed, abyssName, abyssSeed, ABYSS_KEYS, buildAbyss, fixedFromSeed, SEA_KEY, generateDungeon, normalizeSeed, pickAbyss, rebuildDungeon, ROOM_NAMES, strayInto, versionedSeed,
-  type Dungeon,
+  type Dungeon, type Room,
 } from '../dungeon/generate';
 import { randomSeed } from '../dungeon/rng';
 import {
-  abandon, bankRun, currentRoom, isLooted, leaveBonfire, loseBattle, openChest, rest, retreat, retrieveStain, roomNumber,
+  abandon, bankRun, bossAlreadyDown, currentRoom, departEntrance, proceed, returnToBonfire, isLooted, leaveBonfire, loseBattle, openChest, rest, retreat, retrieveStain, roomNumber,
   securedLoot, stainHere, startRun, winBattle,
   type Banked, type RunState,
 } from '../dungeon/run';
@@ -123,7 +123,7 @@ const roomsQuality = (n: number) => Math.max(0, Math.min(1, (n - 3) / 12));
 function mapHTML(d: Dungeon, r: RunState | null): string {
   return `<ol class="floors">${d.floors.map((f, fi) => `
     <li><span class="fl">地下${fi + 1}層</span><ol class="rooms">${f.map((room, ri) => {
-      const here = r && r.floor === fi && r.room === ri;
+      const here = r && !r.atEntrance && r.floor === fi && r.room === ri;
       const done = r && (fi < r.floor || (fi === r.floor && ri < r.room));
       const stain = r?.stain && r.stain.floor === fi && r.stain.room === ri;
       return `<li class="rm rm-${room.kind} ${here ? 'here' : ''} ${done ? 'done' : ''} ${stain ? 'stain' : ''}"${stain ? ` title="血痕（ソウル ${r!.stain!.souls}）"` : ''}>${ROOM_NAMES[room.kind]}${stain ? '<i aria-label="血痕"></i>' : ''}</li>`;
@@ -224,7 +224,16 @@ function renderRun(): void {
 
   const room = currentRoom(dungeon, run)!;
   let action = '';
-  if (room.kind === 'battle' || room.kind === 'boss') {
+  if (run.atEntrance) {
+    // 底の入口からは退却できない（主を倒さずに出るのは脱出）
+    action = bonfireCard(c, run, '入口の篝火', dungeon.rank === '底' ? '底の入口。' : '地下墓の入口。', '出発する', 'depart', dungeon.rank !== '底');
+  } else if (run.cleared) {
+    action = clearedCard(dungeon, run, room);
+  } else if (bossAlreadyDown(dungeon, run)) {
+    action = `<div class="room-card rk-boss"><p class="eyebrow">地下${run.floor + 1}層の主の部屋</p><b>主はもういない</b>
+      <span>倒した主は復活しない。</span>
+      <button type="button" class="btn primary big" data-run="proceed">先へ進む</button></div>`;
+  } else if (room.kind === 'battle' || room.kind === 'boss') {
     const e = room.enemy!;
     const finalBoss = room.kind === 'boss' && run.floor === dungeon.floors.length - 1;
     action = `<div class="room-card rk-${room.kind}"><p class="eyebrow">${room.kind === 'boss' ? (finalBoss ? 'この地下墓の主' : `地下${run.floor + 1}層の主`) : '敵'}</p>
@@ -235,19 +244,12 @@ function renderRun(): void {
   } else if (room.kind === 'chest') {
     action = isLooted(run)
       ? `<div class="room-card rk-chest"><p class="eyebrow">宝箱</p><b>開けた宝箱がある</b><span>中身はもう取った。</span>
-      <button type="button" class="btn primary big" data-run="open">先へ進む</button></div>`
+      <button type="button" class="btn primary big" data-run="open">調べ終える</button></div>`
       : `<div class="room-card rk-chest"><p class="eyebrow">宝箱</p><b>古びた宝箱がある</b>
       <button type="button" class="btn primary big" data-run="open">開ける</button></div>`;
   } else {
-    const rested = run.hp === null && run.fp === null;
-    action = `<div class="room-card rk-bonfire"><p class="eyebrow">篝火</p><b>篝火が灯っている</b>
-      <span>休むとHPとFPが最大に戻ります。ここから退却すると、ソウルと、主を倒した階層で拾ったものを持ち帰れます。</span>
-      <div class="btns">
-        <button type="button" class="btn ${rested ? '' : 'primary'}" data-run="rest" ${rested ? 'disabled' : ''}>${rested ? '休んだ' : '休む'}</button>
-        <button type="button" class="btn ${rested ? 'primary' : ''}" data-run="next">${run.room === dungeon.floors[run.floor].length - 1 ? `先へ進む（地下${run.floor + 2}層へ）` : '先へ進む'}</button>
-        <button type="button" class="btn" data-run="retreat">退却する（持ち帰る）</button>
-        <button type="button" class="btn ${lvPanel ? 'on' : ''}" data-run="lv-toggle">レベルを上げる</button>
-      </div>${lvPanel ? bonfireLevelHTML(c, run) : ''}</div>`;
+    action = bonfireCard(c, run, '篝火', '篝火が灯っている。',
+      run.room === dungeon.floors[run.floor].length - 1 ? `先へ進む（地下${run.floor + 2}層へ）` : '先へ進む', 'next');
   }
 
   const abandon = confirmAbandon
@@ -261,6 +263,34 @@ function renderRun(): void {
     ${action}
     <div class="preview">${mapHTML(dungeon, run)}</div>
     ${abandon}`;
+}
+
+/** 篝火（部屋の篝火と入口の篝火） */
+function bonfireCard(c: Character, r: RunState, title: string, lead: string, nextLabel: string, nextAct: string, canRetreat = true): string {
+  const rested = r.hp === null && r.fp === null;
+  return `<div class="room-card rk-bonfire"><p class="eyebrow">${title}</p><b>${lead}</b>
+    <span>休むとHPとFPが最大に戻ります。レベルも上げられます。${canRetreat ? 'ここから退却すると、ソウルと、主を倒した階層で拾ったものを持ち帰れます。' : 'ここからは退却できません（出るなら脱出）。'}</span>
+    <div class="btns">
+      <button type="button" class="btn ${rested ? '' : 'primary'}" data-run="rest" ${rested ? 'disabled' : ''}>${rested ? '休んだ' : '休む'}</button>
+      <button type="button" class="btn ${rested ? 'primary' : ''}" data-run="${nextAct}">${nextLabel}</button>
+      ${canRetreat ? '<button type="button" class="btn" data-run="retreat">退却する（持ち帰る）</button>' : ''}
+      <button type="button" class="btn ${lvPanel ? 'on' : ''}" data-run="lv-toggle">レベルを上げる</button>
+    </div>${lvPanel ? bonfireLevelHTML(c, r) : ''}</div>`;
+}
+
+/** 部屋を片付けたあと。先へ進むか、篝火に戻るか */
+function clearedCard(d: Dungeon, r: RunState, room: Room): string {
+  const last = r.room === d.floors[r.floor].length - 1;
+  const next = last ? d.floors[r.floor + 1]?.[0] : d.floors[r.floor][r.room + 1];
+  const nextLabel = next ? `先へ進む（次は${last ? `地下${r.floor + 2}層の` : ''}${ROOM_NAMES[next.kind]}）` : '先へ進む';
+  const where = r.bonfire ? `地下${r.bonfire.floor + 1}層の篝火` : '入口の篝火';
+  const what = room.kind === 'chest' ? '宝箱を調べた' : room.kind === 'boss' ? '主を倒した' : '敵を倒した';
+  return `<div class="room-card rk-cleared"><p class="eyebrow">${ROOM_NAMES[room.kind]}</p><b>${what}</b>
+    <span>篝火に戻ると、休んでレベルを上げられる。ただし${where}からここまでの敵は復活する（開けた宝箱・拾った物・倒した主は戻らない）。</span>
+    <div class="btns">
+      <button type="button" class="btn primary" data-run="proceed">${nextLabel}</button>
+      <button type="button" class="btn" data-run="return">篝火に戻る（${where}）</button>
+    </div></div>`;
 }
 
 /** 篝火でレベルを上げる欄。持ち歩いているソウルから先に払う */
@@ -291,7 +321,7 @@ function bonfireLevelUp(stat: StatKey): void {
 
 /** レベルが足りないまま底に入ったときの、脱出を勧める警告（最初の部屋にいるあいだ出す） */
 function underLevelWarning(d: Dungeon, r: RunState, level: number): string {
-  if (d.rank !== '底' || level >= ABYSS.minBaseLevel || r.floor !== 0 || r.room !== 0) return '';
+  if (d.rank !== '底' || level >= ABYSS.minBaseLevel || r.floor !== 0 || r.room !== 0 || r.cleared || r.atEntrance) return '';
   return `<div class="warn abyss-warn" role="alert">
     <b>この底は、あなたにはまだ早い。</b>
     <span>底の敵はLv${ABYSS.minBaseLevel}を基準に強くなる（あなたはLv${level}）。勝ち目はほとんどない。
@@ -455,6 +485,14 @@ export function bindCatacombs(): void {
         if (room?.clue && !isLooted(run)) foundClue(room.clue);
         return step(openChest(dungeon, run),
           isLooted(run) ? '' : room?.loot ? `宝箱から「${lootName(room.loot)}」を見つけた。` : `宝箱にはソウルが残っていた。ソウル +${room?.souls ?? 0}。`);
+      case 'proceed':
+        return step(proceed(dungeon, run));
+      case 'return': {
+        const back = returnToBonfire(run);
+        return step(back, `${back.atEntrance ? '入口の篝火' : '篝火'}に戻った。ここまでの敵は復活している。`);
+      }
+      case 'depart':
+        return step(departEntrance(run), '入口から出発した。');
       case 'lv-toggle':
         lvPanel = !lvPanel;
         return renderRun();
@@ -463,6 +501,7 @@ export function bindCatacombs(): void {
       case 'next':
         return step(leaveBonfire(dungeon, run), `地下${run.floor + 2}層へ降りた。`);
       case 'retreat':
+        if (run.atEntrance && dungeon.rank === '底') return;
         return step(retreat(run));
       case 'abandon':
         confirmAbandon = true;

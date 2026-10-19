@@ -1,6 +1,6 @@
 {
   "name": "cinder-duel",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "description": "ダイスとカードで戦う1対1の決闘ゲーム",
   "scripts": {
     "dev": "vite",

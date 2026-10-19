@@ -5,7 +5,18 @@ import { CARDS } from '../src/data/cards';
 import { ARMORS, SHIELDS, WEAPONS } from '../src/data/equipment';
 import { buildCatacomb, catacombFromSeed, generateDungeon } from '../src/dungeon/generate';
 import { seededRng } from '../src/dungeon/rng';
-import { bankRun, currentRoom, leaveBonfire, loseBattle, openChest, retreat, startRun, winBattle } from '../src/dungeon/run';
+import {
+  bankRun, currentRoom, leaveBonfire, loseBattle, openChest, proceed, retreat, startRun, winBattle, type RunState,
+} from '../src/dungeon/run';
+import type { Dungeon } from '../src/dungeon/generate';
+
+/** 勝って先へ進む（踏破したらそのまま） */
+const win = (d: Dungeon, r: RunState): RunState => {
+  const x = winBattle(d, r, 50, 5);
+  return x.status === 'active' ? proceed(d, x) : x;
+};
+/** 宝箱を開けて先へ進む */
+const open = (d: Dungeon, r: RunState): RunState => proceed(d, openChest(d, r));
 
 const seeds = Array.from({ length: 200 }, (_, i) => `s${i}`);
 
@@ -79,9 +90,9 @@ describe('探索の進み方', () => {
     let run = startRun('c1', d);
     for (let guard = 0; guard < 50 && run.status === 'active'; guard++) {
       const room = currentRoom(d, run)!;
-      if (room.kind === 'chest') run = openChest(d, run);
+      if (room.kind === 'chest') run = open(d, run);
       else if (room.kind === 'bonfire') run = leaveBonfire(d, run);
-      else run = winBattle(d, run, 10, 5);
+      else run = win(d, run);
     }
     return run;
   };
@@ -119,9 +130,9 @@ describe('血痕（倒れたときのソウル）', () => {
   /** 最初の戦闘に勝ってソウルを持った状態で、次の戦闘部屋まで進める */
   function toSecondBattle() {
     let run = startRun('c1', d);
-    run = winBattle(d, run, 50, 5);
+    run = win(d, run);
     while (currentRoom(d, run)!.kind !== 'battle' && currentRoom(d, run)!.kind !== 'boss') {
-      run = currentRoom(d, run)!.kind === 'chest' ? openChest(d, run) : leaveBonfire(d, run);
+      run = currentRoom(d, run)!.kind === 'chest' ? open(d, run) : leaveBonfire(d, run);
     }
     return run;
   }
@@ -140,8 +151,8 @@ describe('血痕（倒れたときのソウル）', () => {
   it('倒れた部屋で回収すれば取り戻せる', () => {
     const run = toSecondBattle();
     let r = loseBattle(run);
-    r = winBattle(d, r, 50, 5); // 1部屋目をやり直し
-    while (!stainHere(r)) r = currentRoom(d, r)!.kind === 'chest' ? openChest(d, r) : currentRoom(d, r)!.kind === 'bonfire' ? leaveBonfire(d, r) : winBattle(d, r, 50, 5);
+    r = win(d, r); // 1部屋目をやり直し
+    while (!stainHere(r)) r = currentRoom(d, r)!.kind === 'chest' ? open(d, r) : currentRoom(d, r)!.kind === 'bonfire' ? leaveBonfire(d, r) : win(d, r);
     const before = r.souls;
     r = retrieveStain(r);
     expect(r.souls).toBe(before + run.souls);
@@ -155,7 +166,7 @@ describe('血痕（倒れたときのソウル）', () => {
     expect(dead2.stain).toBeNull(); // ソウル0で倒れたので新しい血痕もない
     // 回収せずに勝つ
     let r = dead;
-    while (!stainHere(r)) r = currentRoom(d, r)!.kind === 'chest' ? openChest(d, r) : currentRoom(d, r)!.kind === 'bonfire' ? leaveBonfire(d, r) : winBattle(d, r, 50, 5);
+    while (!stainHere(r)) r = currentRoom(d, r)!.kind === 'chest' ? open(d, r) : currentRoom(d, r)!.kind === 'bonfire' ? leaveBonfire(d, r) : win(d, r);
     const won = winBattle(d, r, 50, 5);
     expect(won.stain).toBeNull();
     expect(won.souls).toBe(r.souls + run.souls + currentRoom(d, r)!.souls);
@@ -167,7 +178,7 @@ describe('血痕（倒れたときのソウル）', () => {
     while (currentRoom(cd, run)!.kind !== 'chest' && guard++ < 20) {
       const k = currentRoom(cd, run)!.kind;
       if (k === 'boss') return; // 宝箱のない地下墓
-      run = k === 'bonfire' ? leaveBonfire(cd, run) : winBattle(cd, run, 50, 5);
+      run = k === 'bonfire' ? leaveBonfire(cd, run) : win(cd, run);
     }
     const opened = openChest(cd, run);
     const again = openChest(cd, { ...opened, floor: run.floor, room: run.room });
@@ -205,7 +216,7 @@ describe('退却で持ち帰れるもの', () => {
     let run = startRun('c', d);
     while (run.floor === 0) {
       const k = currentRoom(d, run)!.kind;
-      run = k === 'chest' ? openChest(d, run) : k === 'bonfire' ? leaveBonfire(d, run) : winBattle(d, run, 50, 5);
+      run = k === 'chest' ? open(d, run) : k === 'bonfire' ? leaveBonfire(d, run) : win(d, run);
     }
     expect(run.bossDown).toEqual([0]);
     expect(loseBattle(run).bossDown).toEqual([0]);
@@ -225,5 +236,47 @@ describe('地下墓ごとの敵のレベル', () => {
         expect(charLevel(boss.enemy!), id).toBeGreaterThan(40);
       }
     }
+  });
+});
+
+import { bossAlreadyDown, departEntrance, returnToBonfire } from '../src/dungeon/run';
+
+describe('片付けた部屋から篝火に戻る', () => {
+  it('勝ったら部屋にとどまり、進むか戻るかを選ぶ', () => {
+    const d = buildCatacomb('knight', 'ret', 30);
+    const r = winBattle(d, startRun('c', d), 40, 3);
+    expect(r.cleared).toBe(true);
+    expect([r.floor, r.room]).toEqual([0, 0]);
+    const next = proceed(d, r);
+    expect(next.cleared).toBe(false);
+    expect(next.room).toBe(1);
+  });
+  it('篝火にたどり着く前に戻ると入口の篝火。HP・FPはそのままで、敵は復活する', () => {
+    const d = buildCatacomb('knight', 'ret', 30);
+    let r = win(d, startRun('c', d));
+    r = winBattle(d, { ...r, floor: 0, room: 0 }, 40, 3);
+    const back = returnToBonfire(r);
+    expect(back.atEntrance).toBe(true);
+    expect(back.hp).toBe(40);
+    const out = departEntrance(back);
+    expect([out.floor, out.room, out.atEntrance, out.cleared]).toEqual([0, 0, false, false]);
+    // 敵はまた戦える（ソウルもまた得られる）
+    expect(winBattle(d, out, 40, 3).souls).toBe(r.souls + d.floors[0][0].souls);
+  });
+  it('篝火にたどり着いたあとは、その篝火に戻る。倒した主は復活しない', () => {
+    let d = buildCatacomb('knight', 'b0', 30);
+    for (let i = 1; d.floors.length < 2; i++) d = buildCatacomb('knight', `b${i}`, 30);
+    let r = startRun('c', d);
+    while (r.floor === 0) {
+      const k = currentRoom(d, r)!.kind;
+      r = k === 'chest' ? open(d, r) : k === 'bonfire' ? leaveBonfire(d, r) : win(d, r);
+    }
+    expect(r.bonfire).toEqual({ floor: 0, room: d.floors[0].length - 1 });
+    r = winBattle(d, r, 30, 2);
+    const back = returnToBonfire(r);
+    expect([back.floor, back.room]).toEqual([0, d.floors[0].length - 1]);
+    expect(back.atEntrance).toBe(false);
+    // 1層の主の部屋に戻っても、主はいない
+    expect(bossAlreadyDown(d, { ...back, room: d.floors[0].length - 2 })).toBe(true);
   });
 });
