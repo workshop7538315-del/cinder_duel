@@ -9,7 +9,7 @@ import {
 import { costLabel, typeName } from '../engine/format';
 import type { Attack, Cost, Die, Fighter, WeaponArt } from '../engine/types';
 import { npcDiscards, npcDraws, npcReactChoice, npcReactDice, npcTurn } from './ai';
-import { patternReact, patternTurn } from './pattern';
+import { enterPhase2IfNeeded, patternReact, patternTurn } from './pattern';
 import { AUTO_BEHAVIOR } from '../data/behaviors';
 
 export type Reaction = 'dodge' | 'guard' | 'take' | 'art';
@@ -137,6 +137,7 @@ export class Battle {
         // 強敵・主はスタミナを使わない
         f.stamina = f.pattern ? 0 : this.round === 1 ? f.stInit : Math.min(f.stMax, f.stamina + RULES.staminaRecovery);
         f.buffs.broken = false;
+        if (!f.staggered) f.poise = Math.min(f.maxPoise, f.poise + Math.ceil(f.maxPoise * RULES.poiseRegen));
         f.bleed = Math.max(0, f.bleed - RULES.bleedDecay);
         f.curse = Math.max(0, (f.curse ?? 0) - RULES.curseDecay);
       }
@@ -185,7 +186,14 @@ export class Battle {
     f.chain = 0;
     this.turn = f;
     this.update();
-    if (f.isPlayer) await this.playerTurn();
+    if (f.staggered) {
+      // よろめいていたので、この手番は体勢を立て直すだけ
+      f.staggered = false;
+      f.poise = f.maxPoise;
+      this.log(`${this.who(f)}は体勢を立て直した（よろめいていて手番を失った）。`, this.side(f));
+      this.update();
+      await this.wait(500);
+    } else if (f.isPlayer) await this.playerTurn();
     else if (f.pattern) await patternTurn(this, f, o);
     else await npcTurn(this, f, o);
     // 手番を終えるのも「攻撃以外」なので、反撃の構えがあれば反撃される
@@ -367,8 +375,11 @@ export class Battle {
 
   async strike(att: Fighter, def: Fighter, atk: Attack): Promise<void> {
     if (this.over) return;
-    const raw = applyArmor(def, atk.type, atk.dmg + (atk.weapon ? enchantBonus(att) : 0));
-    this.log(`${this.who(att)}の${atk.label}！ ${typeName(atk.type)}${raw}${atk.unguardable ? '・ガード不可' : ''}`, this.side(att));
+    let raw = applyArmor(def, atk.type, atk.dmg + (atk.weapon ? enchantBonus(att) : 0));
+    // よろめいている相手には、ダメージが増え、リアクションもされない
+    const staggered = !!def.staggered;
+    if (staggered) raw = Math.round(raw * RULES.staggerDamageMult);
+    this.log(`${this.who(att)}の${atk.label}！ ${typeName(atk.type)}${raw}${atk.unguardable ? '・ガード不可' : ''}${staggered ? '（よろめいている相手へ）' : ''}`, this.side(att));
     this.update();
     await this.wait(att.isPlayer ? 250 : 550);
 
@@ -376,13 +387,13 @@ export class Battle {
     const cut = def.pattern ? Math.min(guardCut(def, atk.type), AUTO_BEHAVIOR.guardCutCap) : guardCut(def, atk.type);
     const hit: IncomingHit = {
       attacker: att, attack: atk, raw,
-      dodgeCost: dodgeCost(def, raw),
+      dodgeCost: (() => { const c = dodgeCost(def, raw); return c === null ? null : c + (atk.dodgeExtra ?? 0); })(),
       guardCost: guardCost(def, raw),
       guardCut: cut,
       guardDmg: Math.round(raw * (1 - cut)),
       art: this.reactionArt(def),
     };
-    const r = atk.noReaction ? 'take' : await this.react(def, hit);
+    const r = atk.noReaction || staggered ? 'take' : await this.react(def, hit);
     if (r === 'art' && hit.art) {
       def.fp -= hit.art.fp;
       this.counter = { owner: def, target: att, art: hit.art, cost: hit.art.reaction!.counterCost };
@@ -397,6 +408,8 @@ export class Battle {
       atk.onHit?.(def);
       this.applyBleed(att, def, atk, r === 'guard');
       this.applyCurse(def, atk, r === 'guard');
+      this.applyPoise(def, atk, raw, r === 'guard');
+      if (def.pattern && def.hp > 0) enterPhase2IfNeeded(this, def);
     }
     this.update();
     if (def.hp <= 0) this.finish(att);
@@ -419,6 +432,22 @@ export class Battle {
     } else {
       this.log(`${this.who(def)}に呪死が溜まった（${def.curse}/${RULES.curseThreshold}）。`);
     }
+  }
+
+  /** 体幹を削り、尽きたらよろめかせる。プレイヤーと通常の敵はガードしたときだけ、強敵・主は攻撃を受けても削れる */
+  private applyPoise(def: Fighter, atk: Attack, raw: number, guarded: boolean): void {
+    if (def.hp <= 0 || def.staggered) return;
+    let rate = guarded ? RULES.poiseGuardRate : 0;
+    if (def.pattern) rate = Math.max(rate, RULES.poiseHitRate);
+    if (!rate) return;
+    let dmg = raw * rate * (atk.poiseMult ?? 1);
+    if (def.pattern?.charging) dmg *= RULES.poiseChargeMult;
+    def.poise = Math.max(0, def.poise - Math.ceil(dmg));
+    if (def.poise > 0) return;
+    def.staggered = true;
+    if (def.pattern) def.pattern.charging = false;
+    this.log(`${this.who(def)}は体勢を崩した！（よろめき：次の手番は動けず、受けるダメージが増える）`, 'hit');
+    this.io.flash(def);
   }
 
   /** 当たった攻撃の出血を溜め、弾けたらダメージ */

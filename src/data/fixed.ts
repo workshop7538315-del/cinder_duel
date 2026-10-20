@@ -44,7 +44,7 @@ const E = {
   hunter: { name: '血に酔った狩人', classId: 'bandit', focus: { vit: 3, dex: 3, arc: 4 }, equip: { right: 'oath_saber', left: 'buckler', ...travel } },
   altarGuard: { name: '祭壇の番人', classId: 'hero', focus: { vit: 4, str: 3, arc: 3, end: 2 }, equip: { right: 'oath_cleaver', left: null, ...iron } },
   bloodPriest: { name: '血の司祭', classId: 'confessor', focus: { vit: 3, fai: 2, arc: 5, att: 2 }, equip: { right: 'oath_saber', left: 'oath_seal', ...sage } },
-  bloodLord: { name: '血の君主', classId: 'confessor', focus: { vit: 5, str: 3, arc: 5, end: 3 }, equip: { right: 'oath_cleaver', left: 'oath_seal', ...iron } },
+  bloodLord: { name: '血の君主', classId: 'confessor', focus: { vit: 5, str: 3, arc: 5, end: 3 }, equip: { right: 'oath_cleaver', left: 'oath_seal', ...iron }, behavior: BEHAVIORS.bloodLord },
 } satisfies Record<string, EnemyDef>;
 
 export const FIXED_CATACOMBS: Record<string, FixedCatacomb> = {

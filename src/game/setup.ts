@@ -2,6 +2,7 @@ import { loadout, type Character } from '../character/model';
 import { shuffle } from '../engine/dice';
 import type { Fighter } from '../engine/types';
 import { firstMove } from './pattern';
+import { maxPoise } from '../engine/fighter';
 
 export function makeFighter(c: Character, isPlayer: boolean): Fighter {
   const lo = loadout(c);
@@ -35,6 +36,8 @@ export function makeFighter(c: Character, isPlayer: boolean): Fighter {
     buffs: {},
     acc: lo.acc,
     ...(c.behavior ? { pattern: { behavior: c.behavior, next: firstMove(c.behavior), rank: c.foeRank ?? '強敵' } } : {}),
+    poise: maxPoise(lo.stats, lo.level, c.behavior ? c.foeRank ?? '強敵' : undefined),
+    maxPoise: maxPoise(lo.stats, lo.level, c.behavior ? c.foeRank ?? '強敵' : undefined),
   };
 }
 

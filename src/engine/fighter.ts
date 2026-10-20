@@ -70,6 +70,13 @@ export function guardCut(f: Fighter, type: DamageType): number {
   return Math.min(1, c);
 }
 
+/** 体幹の上限（強敵・主は別の式） */
+export function maxPoise(stats: { end: number }, level: number, rank?: '強敵' | '主'): number {
+  if (rank === '主') return Math.round(RULES.bossPoise.base + level * RULES.bossPoise.perLevel);
+  if (rank === '強敵') return Math.round(RULES.elitePoise.base + level * RULES.elitePoise.perLevel);
+  return Math.round(RULES.poiseBase + stats.end * RULES.poisePerEnd + level * RULES.poisePerLevel);
+}
+
 /** 回避の追加コストが1上がるダメージの幅（自分のレベルで広がる） */
 export const dodgeBand = (level: number): number => Math.round(RULES.dodgeBandBase + level * RULES.dodgeBandPerLevel);
 

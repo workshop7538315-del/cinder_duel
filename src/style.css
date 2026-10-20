@@ -320,3 +320,8 @@ select.sock.cursed{border-color:#a8433b;color:#e8c4c1}
 .row.intent .nx{flex:1;font-weight:700;color:#e9c46a;letter-spacing:.04em}
 .chip.rank{background:#4a2a2a;color:#f0c6c0;border-color:#7a3a35}
 .row.intent .num{white-space:nowrap;width:auto}
+
+/* ---- 体幹 ---- */
+.bar.poise i{background:#c9a24a}
+.bar.poise.broken{outline:1px solid #e3a19c}
+.bar.poise.broken i{background:#e3a19c}

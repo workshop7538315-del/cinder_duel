@@ -5,7 +5,7 @@ import { FIXED, FIXED_CATACOMBS } from '../data/fixed';
 import { CATACOMB_ACCESSORIES } from '../data/accessories';
 import { CRYSTAL, CRYSTAL_KEYS, rollCrystal, rollCursedCrystal } from '../data/crystals';
 import type { CrystalKey } from '../engine/types';
-import { autoBehavior } from '../game/pattern';
+import { autoBehavior, withAutoPhase2 } from '../game/pattern';
 import { pick, pickWeighted, randInt, seededRng, type SeededRng } from './rng';
 
 export type RoomKind = 'battle' | 'chest' | 'bonfire' | 'boss';
@@ -75,7 +75,7 @@ function markBosses(d: Dungeon): Dungeon {
       r.eliteDone = true;
     }
     if (r.kind !== 'boss' || !r.enemy) continue;
-    r.enemy.behavior ??= autoBehavior(loadout(r.enemy), r.enemy.deck);
+    r.enemy.behavior = withAutoPhase2(r.enemy.behavior ?? autoBehavior(loadout(r.enemy), r.enemy.deck));
     r.enemy.foeRank = '主';
   }
   return d;

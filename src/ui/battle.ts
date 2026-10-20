@@ -48,6 +48,9 @@ function panelHTML(b: Battle, f: Fighter): string {
   if (!f.isPlayer && !f.pattern) chips.push(`<span class="chip">手札 ${f.hand.length}</span>`);
   if (f.pattern) chips.push(`<span class="chip rank">${f.pattern.rank}</span>`);
   if (f.pattern?.guarding) chips.push(`<span class="chip buff">守りを固めている</span>`);
+  if (f.pattern?.charging) chips.push(`<span class="chip debuff">溜め中（崩れやすい）</span>`);
+  if (f.pattern?.phased) chips.push(`<span class="chip rank">第二形態</span>`);
+  if (f.staggered) chips.push(`<span class="chip debuff">よろめき</span>`);
   if (f.buffs.stance) chips.push(`<span class="chip buff">構え</span>`);
   const en = f.buffs.enchant;
   if (en) chips.push(`<span class="chip buff">${en.name}${en.bonus ? ` +${en.bonus}` : ''}${en.bleed ? ` 出血+${en.bleed}` : ''}</span>`);
@@ -63,6 +66,7 @@ function panelHTML(b: Battle, f: Fighter): string {
       <span class="wt">${f.weight.name}・${gear}</span></div>
     <div class="row"><span class="lbl">HP</span>${bar('hp', f.hp, f.maxHp)}<span class="num">${f.hp}/${f.maxHp}</span></div>
     <div class="row"><span class="lbl">FP</span>${bar('fp', f.fp, f.maxFp)}<span class="num">${f.fp}/${f.maxFp}</span></div>
+    <div class="row"><span class="lbl">体幹</span>${bar(`poise${f.staggered ? ' broken' : ''}`, f.poise, f.maxPoise)}<span class="num">${f.staggered ? 'よろめき' : `${f.poise}/${f.maxPoise}`}</span></div>
     ${f.pattern
       ? `<div class="row intent"><span class="lbl">次</span><span class="nx">${esc(nextMoveName(f) ?? '')}</span><span class="num dim">${f.pattern.behavior.mode === 'cycle' ? '決まった順' : '読めない'}</span></div>`
       : `<div class="row"><span class="lbl">ST</span><span class="sd">${sq}</span><span class="num">${f.stamina}/${f.stMax}</span></div>`}
@@ -161,13 +165,16 @@ function dodgeExtra(hit: IncomingHit): string {
   return `（重さ${base}＋大きな一撃+${hit.dodgeCost - base}）`;
 }
 
+/** ガードしたときに減る体幹 */
+const guardPoise = (hit: IncomingHit): number => Math.ceil(hit.raw * RULES.poiseGuardRate * (hit.attack.poiseMult ?? 1));
+
 function reactHead(hit: IncomingHit): string {
   const o = hit.attack;
   return `<p class="eyebrow">リアクション</p><h3>${esc(hit.attacker.name)}の${o.label}</h3>
     <p class="incoming">${typeName(o.type)} <b>${hit.raw}</b>${o.unguardable ? '　ガード不可' : ''}</p>
     ${o.curse || o.drain ? `<p class="stain-note">${o.curse ? `当たると呪死が${o.curse}溜まる（${RULES.curseThreshold}で即死。今 ${hit.attacker === B?.e ? B.p.curse ?? 0 : 0}）。` : ''}${o.drain ? '呪死するとレベルを1失う。' : ''}回避すれば防げる。</p>` : ''}
     <ul class="opts"><li>${hit.dodgeCost === null ? '過重のため回避できない' : `回避 [${hit.dodgeCost}] → 0ダメージ${dodgeExtra(hit)}`}</li>
-    <li>${o.unguardable ? 'ガードはできない' : `ガード [${hit.guardCost}] → ${hit.guardDmg}ダメージ（カット${Math.round(hit.guardCut * 100)}%）`}</li>
+    <li>${o.unguardable ? 'ガードはできない' : `ガード [${hit.guardCost}] → ${hit.guardDmg}ダメージ（カット${Math.round(hit.guardCut * 100)}%）・体幹 −${guardPoise(hit)}${B && B.p.poise - guardPoise(hit) <= 0 ? '<b class="warn">（よろめく）</b>' : ''}`}</li>
     ${hit.art ? `<li>戦技「${hit.art.name}」${costLabel(hit.art.cost, hit.art.fp)} → 回避して反撃の構え</li>` : ''}</ul>`;
 }
 
