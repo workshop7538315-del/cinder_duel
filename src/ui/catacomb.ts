@@ -463,7 +463,7 @@ function fight(): void {
   const d = dungeon;
   let r = run;
   const stain = stainHere(r);
-  const firstLoot = (room.loot || room.extra) && !isLooted(r);
+  const firstLoot = (room.loot || room.extra || room.bonus) && !isLooted(r);
   startBattle(c, room.enemy!, (won, me) => {
     // 呪死してレベルを失ったら、すぐにキャラへ反映する（脱出しても戻らない）
     let lost = '';
@@ -474,7 +474,7 @@ function fight(): void {
     }
     if (won) {
       if (room.clue) foundClue(room.clue);
-      const gotLoot = firstLoot ? [room.loot, room.extra].filter((l): l is LootDef => !!l).map((l) => `「${lootName(l)}」を拾った。`).join('') : '';
+      const gotLoot = firstLoot ? [room.loot, room.extra, room.bonus].filter((l): l is LootDef => !!l).map((l) => `「${lootName(l)}」を拾った。`).join('') : '';
       const gotStain = stainHere(r) ? `血痕のソウル ${stainHere(r)!.souls} を取り戻した。` : '';
       step(winBattle(d, r, me.hp, me.fp), `${lost}${room.enemy!.name}を倒した。ソウル +${room.souls}。${gotLoot}${gotStain}`);
     } else {
@@ -559,7 +559,8 @@ export function bindCatacombs(): void {
         if (room?.clue && !isLooted(run)) foundClue(room.clue);
         return step(openChest(dungeon, run),
           (isLooted(run) ? '' : room?.loot ? `宝箱から「${lootName(room.loot)}」を見つけた。` : `宝箱にはソウルが残っていた。ソウル +${room?.souls ?? 0}。`)
-          + (!isLooted(run) && room?.extra ? `奥に「${lootName(room.extra)}」もあった。` : ''));
+          + (!isLooted(run) && room?.extra ? `奥に「${lootName(room.extra)}」もあった。` : '')
+          + (!isLooted(run) && room?.bonus ? `底に「${lootName(room.bonus)}」が隠されていた。` : ''));
       case 'proceed':
         return step(proceed(dungeon, run));
       case 'return': {

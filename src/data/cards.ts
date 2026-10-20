@@ -18,7 +18,8 @@ export interface CardDef {
   /** エンチャント（重ね掛け不可。エンチャントできない武器には使えない） */
   enchant?: { bonus?: number; bleed?: number };
   /** 使うときに手札から選んで捨てる枚数（min〜max） */
-  discard?: { min: number; max: number };
+  /** 使うときに手札を捨てる枚数（min〜max）。random なら、枚数だけ選んで、捨てるカードは手札からランダム */
+  discard?: { min: number; max: number; random?: boolean };
   /** 自分では使えない（捨てられたときにだけ発動する） */
   unplayable?: boolean;
   /** 捨てられたときに発動する */
@@ -235,8 +236,8 @@ export const CARDS: Record<string, CardDef> = {
   // ---- 邪教の祈祷（底を信仰する邪教。知力で使い、使うときに手札を捨てる。自分が捨てられても発動する） ----
   abyss_offering: {
     name: '淵への供物', kind: '祈祷', role: 'utility', school: 'incant', cost: { t: 'face', f: [1] }, fp: 1, req: { int: 12 },
-    discard: { min: 1, max: 2 },
-    text: () => '手札を1〜2枚捨てる。捨てた枚数×2のFPを回復し、カードを1枚引く。【捨てられると】HPを最大HPの8%回復する。',
+    discard: { min: 1, max: 2, random: true },
+    text: () => '手札からランダムに1〜2枚捨てる。捨てた枚数×2のFPを回復し、カードを1枚引く。【捨てられると】HPを最大HPの8%回復する。',
     onDiscard: {
       text: 'HPを最大HPの8%回復',
       run: (b, f) => b.heal(f, Math.round(f.maxHp * 0.08)),
@@ -250,8 +251,8 @@ export const CARDS: Record<string, CardDef> = {
   },
   abyss_whisper: {
     name: '淵の囁き', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 2 }, fp: 2, req: { int: 14 },
-    discard: { min: 1, max: 1 },
-    text: (f) => `手札を1枚捨てる。魔力${num(spell(f, 'incant', 4, 0.6), '4+聖印×0.6')}＋捨てた枚数×5の攻撃。【捨てられると】相手に魔力5（リアクションできない）。`,
+    discard: { min: 1, max: 1, random: true },
+    text: (f) => `手札からランダムに1枚捨てる。魔力${num(spell(f, 'incant', 4, 0.6), '4+聖印×0.6')}＋捨てた枚数×5の攻撃。【捨てられると】相手に魔力5（リアクションできない）。`,
     onDiscard: {
       text: '相手に魔力5（リアクション不可）',
       run: (b, f, o) => b.strike(f, o, { label: '淵の囁き（残響）', dmg: 5, type: 'magic', noReaction: true }),
@@ -261,8 +262,8 @@ export const CARDS: Record<string, CardDef> = {
   },
   sinking_prayer: {
     name: '沈む祈り', kind: '祈祷', role: 'heal', school: 'incant', cost: { t: 'face', f: [2, 4, 6] }, fp: 3, req: { int: 18 },
-    discard: { min: 1, max: 2 },
-    text: (f) => `手札を1〜2枚捨て、捨てた枚数＋1枚引く。HPを（${num(spell(f, 'incant', 4, 0.3), '4+聖印×0.3')}）×捨てた枚数回復する。【捨てられると】FPを3回復する。`,
+    discard: { min: 1, max: 2, random: true },
+    text: (f) => `手札からランダムに1〜2枚捨て、捨てた枚数＋1枚引く。HPを（${num(spell(f, 'incant', 4, 0.3), '4+聖印×0.3')}）×捨てた枚数回復する。【捨てられると】FPを3回復する。`,
     onDiscard: {
       text: 'FP3回復',
       run: (b, f) => {
@@ -279,8 +280,8 @@ export const CARDS: Record<string, CardDef> = {
   },
   bottomless_craving: {
     name: '底なしの渇望', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 4 }, fp: 4, req: { int: 22 },
-    discard: { min: 1, max: 3 },
-    text: (f) => `手札を1〜3枚捨てる。魔力${num(spell(f, 'incant', 6, 0.8), '6+聖印×0.8')}＋捨てた枚数×5の攻撃。当たると呪死が捨てた枚数×2溜まる。【捨てられると】相手に呪死3（リアクションできない）。`,
+    discard: { min: 1, max: 3, random: true },
+    text: (f) => `手札からランダムに1〜3枚捨てる。魔力${num(spell(f, 'incant', 6, 0.8), '6+聖印×0.8')}＋捨てた枚数×5の攻撃。当たると呪死が捨てた枚数×2溜まる。【捨てられると】相手に呪死3（リアクションできない）。`,
     onDiscard: {
       text: '相手に呪死3（リアクション不可）',
       run: (b, f, o) => b.strike(f, o, { label: '渇望の残滓', dmg: 1, type: 'magic', noReaction: true, curse: 3 }),
@@ -292,8 +293,8 @@ export const CARDS: Record<string, CardDef> = {
   },
   black_tide: {
     name: '黒い潮', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 5 }, fp: 5, req: { int: 26 },
-    discard: { min: 2, max: 2 },
-    text: (f) => `手札を2枚捨てる。ガードできない魔力${num(spell(f, 'incant', 10, 1), '10+聖印')}＋捨てた枚数×4の攻撃。【捨てられると】スタミナダイス+1（上限まで）。`,
+    discard: { min: 2, max: 2, random: true },
+    text: (f) => `手札からランダムに2枚捨てる。ガードできない魔力${num(spell(f, 'incant', 10, 1), '10+聖印')}＋捨てた枚数×4の攻撃。【捨てられると】スタミナダイス+1（上限まで）。`,
     onDiscard: {
       text: 'スタミナダイス+1',
       run: (b, f) => {

@@ -240,6 +240,15 @@ const io: BattleIO = {
     return v as Reaction;
   },
 
+  async askDiscardCount(min, max, cardName) {
+    const k = await askCount({
+      title: `「${esc(cardName)}」で捨てる枚数`,
+      text: `${min}〜${max}枚から選んでください。捨てるカードは手札からランダムに決まります。捨てると発動するカードは、ここで発動します。`,
+      max, def: max, btn: '捨てる',
+    });
+    return Math.max(min, k);
+  },
+
   askDiscard(hand, min, max, cardName) {
     return pickCards(
       `「${cardName}」で捨てるカード`,

@@ -125,7 +125,7 @@ function render(): void {
   const armorRows = ARMOR_SLOTS.map(({ slot, name }) => {
     const list = Object.entries(ARMORS).filter(([id, a]) => a.slot === slot && own(id)).map(([id, a]) => [id, `${a.name}（${kg(a.weight)}）`] as [string, string]);
     const a = c.equip[slot] ? ARMORS[c.equip[slot]!] : null;
-    const detail = a ? `重さ ${kg(a.weight)}　カット 物理${pct(a.cut.phys)}・魔力${pct(a.cut.magic)}・聖${pct(a.cut.holy)}` : '<span class="dim">なし</span>';
+    const detail = a ? `重さ ${kg(a.weight)}　カット 物理${pct(a.cut.phys)}・魔力${pct(a.cut.magic)}・聖${pct(a.cut.holy)}${a.effect?.drawOnDiscard ? `　<b>付帯効果：カードの効果で手札を捨てたら、${a.effect.drawOnDiscard}枚引く</b>` : ''}` : '<span class="dim">なし</span>';
     return slotRow(slot, name, list, 'なし', detail);
   }).join('');
 

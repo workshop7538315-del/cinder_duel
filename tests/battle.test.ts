@@ -26,6 +26,7 @@ function idleIO(get: () => Battle): BattleIO {
     askReactChoice: async (_h, _d, dodge, guard) => (dodge ? 'dodge' : guard ? 'guard' : 'take'),
     askCounter: async () => 0,
     askDiscard: async (_h, min) => Array.from({ length: min }, (_, i) => i),
+    askDiscardCount: async (min) => min,
     finished: () => {},
   };
 }

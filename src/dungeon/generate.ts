@@ -26,6 +26,8 @@ export interface Room {
   extra?: LootDef | null;
   /** 強敵の補正を掛けた（二重に掛けないため） */
   eliteDone?: boolean;
+  /** 宝の表とは別の、まれな落とし物（邪教のフードなど） */
+  bonus?: LootDef | null;
 }
 
 export interface Dungeon {
@@ -410,6 +412,13 @@ export function buildCatacomb(catacombId: string, seed: string, level: number): 
     }
     return rooms;
   });
+
+  // まれな落とし物も別の乱数で決める
+  for (const bd of cat.bonusDrops ?? []) floors.forEach((rooms, fi) => rooms.forEach((room, ri) => {
+    const last = fi === floors.length - 1;
+    const chance = room.kind === 'boss' ? (last ? bd.boss : bd.floorBoss) : room.kind === 'chest' ? bd.chest : 0;
+    if (chance && !room.bonus && seededRng(`bonus:${catacombId}:${bd.loot.id}:${seed}:${fi}:${ri}`)() < chance) room.bonus = bd.loot;
+  }));
 
   // 手がかりは別の乱数で決める（第1版の間取りや宝に影響しないように）
   floors.forEach((rooms, fi) => rooms.forEach((room, ri) => {
