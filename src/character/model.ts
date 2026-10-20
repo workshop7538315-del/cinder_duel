@@ -177,7 +177,7 @@ export function loadout(c: Pick<Character, 'classId' | 'alloc' | 'equip' | 'npc'
     accessories: accs,
     acc: {
       guardDiscount: sum((a) => a.effect.guardDiscount) + ct.guard, healPct: sum((a) => a.effect.healPct), bleedPct: sum((a) => a.effect.bleedPct),
-      atkPct: ct.atk, artPct: ct.art, spellPct: ct.spell, bleedAdd: ct.bleed, curseAdd: ct.curse,
+      atkPct: ct.atk, artPct: ct.art, spellPct: ct.spell + sum((a) => a.effect.spellPct), bleedAdd: ct.bleed, curseAdd: ct.curse,
     },
     crystals,
   };

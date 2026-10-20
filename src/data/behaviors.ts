@@ -46,8 +46,37 @@ export const BEHAVIORS = {
       { name: '挟み潰し', use: 'art' },
     ],
   },
+  /** 淵の狂信者。斧を振り回し、淵に祈る */
+  zealot: {
+    mode: 'random', dodge: 0.1, guard: 0.25,
+    moves: [
+      { name: '狂乱の連撃', use: 'weapon', hits: 2, mult: 1.15, weight: 3 },
+      { name: '淵の囁き', card: 'abyss_whisper', discarded: 2, weight: 2 },
+      { name: '叩き伏せ', use: 'weapon', mult: 1.5, poiseMult: 1.5, weight: 2 },
+      { name: '自らを捧げる', heal: 0.08, weight: 1 },
+    ],
+  },
 
   // ---- 主（手で書いた動き方。HPが半分を切ると第二形態） ----
+  /** 淵の大司祭。祈祷と儀式の短剣。第二形態で淵を呼ぶ */
+  archpriest: {
+    mode: 'cycle', dodge: 0.25, guard: 0.1,
+    moves: [
+      { name: '淵の囁き', card: 'abyss_whisper', discarded: 3 },
+      { name: '儀式の二連突き', use: 'weapon', hits: 2, mult: 1.2 },
+      { name: '底なしの渇望', card: 'bottomless_craving', discarded: 4 },
+      { name: '沈む祈り', card: 'sinking_prayer', discarded: 2 },
+    ],
+    phase2: {
+      at: 0.5, mode: 'random', text: '淵の大司祭が祈りを叫ぶ。床の裂け目から、底の気配が這い上がる……！',
+      moves: [
+        { name: '黒い潮', card: 'black_tide', discarded: 5, weight: 2 },
+        { name: '底なしの渇望', card: 'bottomless_craving', discarded: 5, weight: 2 },
+        { name: '淵の招来', card: 'black_tide', discarded: 12, charge: true, weight: 2 },
+        { name: '儀式の三連突き', use: 'weapon', hits: 3, mult: 1.2, weight: 2 },
+      ],
+    },
+  },
   /** 煤けた騎士長（斧槍と盾） */
   knightCaptain: {
     mode: 'cycle', dodge: 0, guard: 0.35,

@@ -163,6 +163,20 @@ export const WEAPONS: Record<string, Weapon> = {
     // 信仰はほとんど効かず、神秘が主。筋力と技量も少し乗る
     power: { base: 0, scale: { fai: 0.1, arc: 0.5, str: 0.1, dex: 0.1 } },
   },
+  // ---- 邪教（底を信仰する者たち）。祈祷の触媒だが、知力で伸びる ----
+  cult_seal: {
+    kind: 'catalyst', school: 'incant', name: '邪教の聖印', weight: 1.5, req: { int: 14 },
+    first: 3, inc: 2, maxChain: 1, type: 'phys',
+    dmg: { base: 2, scale: { str: 0.1 } }, cut: { phys: 0.1, magic: 0.25, holy: 0.1 },
+    power: { base: 0, scale: { int: 0.5, arc: 0.1 } },
+  },
+  ritual_dagger: {
+    kind: 'weapon', name: '儀式の短剣', weight: 1.5, req: { dex: 10, int: 14 },
+    first: 2, inc: 2, maxChain: 3, type: 'phys', curse: 1,
+    dmg: { base: 3, scale: { dex: 0.25, int: 0.2 } }, cut: { phys: 0.2, magic: 0.2, holy: 0.1 },
+    art: { name: '供犠の突き', cost: { t: 'face', f: [1, 2] }, fp: 3, type: 'magic', curse: 3,
+      dmg: { base: 6, scale: { int: 0.35 } } },
+  },
   // ---- 底の触媒武器（武器としても、祈祷の触媒としても使える） ----
   deep_staff: {
     kind: 'weapon', school: 'incant', sockets: 3, name: '地底の大剣', weight: 11, req: { str: 34, fai: 28 },

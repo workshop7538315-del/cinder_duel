@@ -1,0 +1,536 @@
+[
+ {
+  "seed": "3-k3d9xq2m",
+  "catacombId": "samurai",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": "item:travel_hood",
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": true
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": true
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた剣聖/samurai/katana",
+     "loot": "item:dagger",
+     "soulsChest": false
+    }
+   ]
+  ]
+ },
+ {
+  "seed": "3-ash00001",
+  "catacombId": "samurai",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた浪人/warrior/dagger",
+     "loot": "item:travel_gloves",
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": true
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた浪人（地下1層の主）/warrior/dagger",
+     "loot": "card:knife",
+     "soulsChest": false
+    },
+    {
+     "kind": "bonfire",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": false
+    }
+   ],
+   [
+    {
+     "kind": "battle",
+     "enemy": "煤けた刀使/samurai/katana",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた刀使/samurai/katana",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": "item:buckler",
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた剣聖/samurai/katana",
+     "loot": "item:dagger",
+     "soulsChest": false
+    }
+   ]
+  ]
+ },
+ {
+  "seed": "3-q8w7e6r5",
+  "catacombId": "warrior",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた戦士（地下1層の主）/hero/battleaxe",
+     "loot": "item:iron_greaves",
+     "soulsChest": false
+    },
+    {
+     "kind": "bonfire",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": false
+    }
+   ],
+   [
+    {
+     "kind": "battle",
+     "enemy": "煤けた闘士/warrior/katana",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた闘士（地下2層の主）/warrior/katana",
+     "loot": "item:iron_greaves",
+     "soulsChest": false
+    },
+    {
+     "kind": "bonfire",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": false
+    }
+   ],
+   [
+    {
+     "kind": "battle",
+     "enemy": "煤けた闘士/warrior/katana",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": "card:breath",
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた闘士/warrior/katana",
+     "loot": "item:battleaxe",
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた大戦士/hero/greatsword",
+     "loot": "item:battleaxe",
+     "soulsChest": false
+    }
+   ]
+  ]
+ },
+ {
+  "seed": "3-blood777",
+  "catacombId": "knight",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": "item:knight_helm",
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた従士/hero/battleaxe",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": true
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた騎士長/vagabond/halberd",
+     "loot": "item:heater",
+     "soulsChest": false
+    }
+   ]
+  ]
+ },
+ {
+  "seed": "3-zzzzzzzz",
+  "catacombId": "cleric",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": true
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた司教/confessor/longsword",
+     "loot": "card:spear",
+     "soulsChest": false
+    }
+   ]
+  ]
+ },
+ {
+  "seed": "3-m1n2b3v4",
+  "catacombId": "warrior",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた戦士/hero/battleaxe",
+     "loot": "card:kick",
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": "item:iron_greaves",
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた闘士（地下1層の主）/warrior/katana",
+     "loot": "item:iron_greaves",
+     "soulsChest": false
+    },
+    {
+     "kind": "bonfire",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": false
+    }
+   ],
+   [
+    {
+     "kind": "battle",
+     "enemy": "煤けた戦士/hero/battleaxe",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた闘士/warrior/katana",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた戦士/hero/battleaxe",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた戦士（地下2層の主）/hero/battleaxe",
+     "loot": "item:iron_armor",
+     "soulsChest": false
+    },
+    {
+     "kind": "bonfire",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": false
+    }
+   ],
+   [
+    {
+     "kind": "battle",
+     "enemy": "煤けた闘士/warrior/katana",
+     "loot": "item:battleaxe",
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": "card:tackle",
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた大戦士/hero/greatsword",
+     "loot": "card:tackle",
+     "soulsChest": false
+    }
+   ]
+  ]
+ },
+ {
+  "seed": "3-lantern9",
+  "catacombId": "samurai",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた浪人/warrior/dagger",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた刀使（地下1層の主）/samurai/katana",
+     "loot": "item:travel_gloves",
+     "soulsChest": false
+    },
+    {
+     "kind": "bonfire",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": false
+    }
+   ],
+   [
+    {
+     "kind": "battle",
+     "enemy": "煤けた浪人/warrior/dagger",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた浪人/warrior/dagger",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた浪人/warrior/dagger",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた浪人（地下2層の主）/warrior/dagger",
+     "loot": "card:breath",
+     "soulsChest": false
+    },
+    {
+     "kind": "bonfire",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": false
+    }
+   ],
+   [
+    {
+     "kind": "battle",
+     "enemy": "煤けた刀使/samurai/katana",
+     "loot": "item:dagger",
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "煤けた刀使/samurai/katana",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "bonfire",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "煤けた剣聖/samurai/katana",
+     "loot": "card:knife",
+     "soulsChest": false
+    }
+   ]
+  ]
+ },
+ {
+  "seed": "3-catacomb",
+  "catacombId": "blood",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "血盟騎士/confessor/oath_cleaver",
+     "loot": "card:flask",
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "血盟騎士団長/confessor/oath_cleaver",
+     "loot": "item:oath_saber",
+     "soulsChest": false
+    }
+   ]
+  ]
+ },
+ {
+  "seed": "3-cult1",
+  "catacombId": "cult",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": "item:sage_hood",
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "邪教徒/prophet/ritual_dagger",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "bonfire",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "淵の大司祭/astrologer/ritual_dagger",
+     "loot": "item:ritual_dagger",
+     "soulsChest": false
+    }
+   ]
+  ]
+ },
+ {
+  "seed": "3-cult2",
+  "catacombId": "cult",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "battle",
+     "enemy": "邪教徒/prophet/ritual_dagger",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "淵の大司祭/astrologer/ritual_dagger",
+     "loot": "item:ritual_dagger",
+     "soulsChest": false
+    }
+   ]
+  ]
+ },
+ {
+  "seed": "3-cult9",
+  "catacombId": "cult",
+  "floors": [
+   [
+    {
+     "kind": "battle",
+     "enemy": "亡者/wretch/hollow_blade",
+     "loot": null,
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": "item:sage_hood",
+     "soulsChest": false
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": null,
+     "soulsChest": true
+    },
+    {
+     "kind": "chest",
+     "enemy": null,
+     "loot": "card:abyss_whisper",
+     "soulsChest": false
+    },
+    {
+     "kind": "boss",
+     "enemy": "淵の大司祭/astrologer/ritual_dagger",
+     "loot": "card:abyss_whisper",
+     "soulsChest": false
+    }
+   ]
+  ]
+ }
+]

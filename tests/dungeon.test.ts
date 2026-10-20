@@ -61,10 +61,13 @@ describe('地下墓の生成', () => {
     expect(generateDungeon(' HELLO ', 25)).toEqual(generateDungeon('hello', 25));
     expect(generateDungeon('hello', 25)).not.toEqual(generateDungeon('hellp', 25));
   });
-  it('シードでどの地下墓かが決まり、6種類すべてに行ける', () => {
+  it('シードでどの地下墓かが決まり、第1・2版は元の6種類、第3版は邪教徒の地下墓も含めた7種類すべてに行ける', () => {
     expect(generateDungeon('abc', 30).catacombId).toBe(catacombFromSeed('abc'));
-    const seen = new Set(seeds.map(catacombFromSeed));
-    expect([...seen].sort()).toEqual(Object.keys(CATACOMBS).sort());
+    expect(generateDungeon('3-abc', 30).catacombId).toBe(catacombFromSeed('3-abc'));
+    const v1 = new Set(seeds.map(catacombFromSeed));
+    expect([...v1].sort()).toEqual(Object.keys(CATACOMBS).filter((k) => k !== 'cult').sort());
+    const v3 = new Set(seeds.map((s) => catacombFromSeed(`3-${s}`)));
+    expect([...v3].sort()).toEqual(Object.keys(CATACOMBS).sort());
   });
   it('長い地下墓ほど良いものが出やすい', () => {
     const avg = (pred: (n: number) => boolean) => {

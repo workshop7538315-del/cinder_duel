@@ -1,5 +1,5 @@
 import { autoAlloc, autoDeck, inventoryOf, loadout, type Character } from '../character/model';
-import { CATACOMB_ORDER, CATACOMBS, DUNGEON, HOLLOW, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
+import { CATACOMB_ORDER, CATACOMB_ORDER_V3, CATACOMBS, DUNGEON, HOLLOW, type CatacombDef, type EnemyDef, type LootDef } from '../data/catacombs';
 import { ABYSS, ABYSS_KEYS, ABYSSES, BASILISK, DEEP, DEEP_KEY, SEA_KEY, SEAFLOOR } from '../data/abyss';
 import { FIXED, FIXED_CATACOMBS } from '../data/fixed';
 import { CATACOMB_ACCESSORIES } from '../data/accessories';
@@ -104,7 +104,7 @@ export const normalizeSeed = (seed: string): string => seed.trim().toLowerCase()
  * こうすると、古いシードはずっと同じ地下墓のまま遊べる。
  * 数字のないシード（v0.7〜0.9で作ったもの）は第1版として扱う。
  */
-export const CURRENT_SEED_VERSION = 2;
+export const CURRENT_SEED_VERSION = 3;
 
 type Generator = (seed: string, level: number) => Dungeon;
 
@@ -112,6 +112,8 @@ const GENERATORS: Record<number, Generator> = {
   1: (seed, level) => buildCatacomb(catacombFromSeedV1(seed), seed, level),
   // 第2版: 第1版と同じ地下墓・間取り・宝で、最初の部屋の敵だけ弱い亡者になる
   2: (seed, level) => withHollow(buildCatacomb(catacombFromSeedV1(seed), seed, level)),
+  // 第3版: 第2版と同じ作り方で、行ける地下墓に「邪教徒の地下墓」が増えた
+  3: (seed, level) => withHollow(buildCatacomb(catacombFromSeedV3(seed), seed, level)),
 };
 
 /** 最初の部屋の敵を、弱い亡者に替える（落とし物はそのまま） */
@@ -140,9 +142,13 @@ export function fixedFromSeed(seed: string): string | null {
 function catacombFromSeedV1(seed: string): string {
   return pick(seededRng(`catacomb:${normalizeSeed(seed)}`), CATACOMB_ORDER);
 }
-/** 今の版で、そのシードがどの地下墓になるか */
+/** 第3版: 邪教徒の地下墓を含めた並びから選ぶ */
+function catacombFromSeedV3(seed: string): string {
+  return pick(seededRng(`catacomb:${normalizeSeed(seed)}`), CATACOMB_ORDER_V3);
+}
+/** そのシードがどの地下墓になるか（シードの版に合わせる） */
 export const catacombFromSeed = (seed: string): string =>
-  fixedFromSeed(seed) ? `fixed:${fixedFromSeed(seed)}` : catacombFromSeedV1(seed);
+  fixedFromSeed(seed) ? `fixed:${fixedFromSeed(seed)}` : seedVersion(seed) >= 3 ? catacombFromSeedV3(seed) : catacombFromSeedV1(seed);
 
 /** シードから地下墓を作る。同じシード・レベルなら必ず同じ地下墓・同じ中身になる */
 export function generateDungeon(seed: string, level: number, cycle = 1): Dungeon {

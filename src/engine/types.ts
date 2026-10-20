@@ -128,6 +128,8 @@ export interface PatternMove {
   heal?: number;
   /** カードの効果を使う（魔術・祈祷など。スタミナもFPも払わない） */
   card?: string;
+  /** card を使うとき、手札を何枚捨てたことにするか（捨てて使うカード用。既定0） */
+  discarded?: number;
   /** 1手番かけて溜めてから放つ大技（溜めている手番は予告だけで動かない） */
   charge?: boolean;
   /** この攻撃への回避のコストを増やす */
@@ -197,6 +199,8 @@ export interface AccessoryEffect {
   healPct?: number;
   /** 与える出血の割合増し */
   bleedPct?: number;
+  /** 魔術・祈祷の威力の割合増し */
+  spellPct?: number;
 }
 
 /** アクセサリ（指輪・タリスマン。呼び名が違うだけ） */
