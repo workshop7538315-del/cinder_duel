@@ -98,7 +98,7 @@ export async function patternTurn(b: Battle, e: Fighter, p: Fighter): Promise<vo
     st.guarding = true;
     b.log(`${e.name}は守りを固めた（次の手番までガードする）。`, 'foe');
   }
-  if (m.card && CARDS[m.card]) await CARDS[m.card].run(b, e, p, { discarded: 0 });
+  if (m.card && CARDS[m.card]) await CARDS[m.card].run(b, e, p, { discarded: m.discarded ?? 0 });
   if (m.use) {
     const src = m.use === 'art' ? e.right.art ?? null : null;
     const dmg = src ? src.dmg : e.right.dmg;

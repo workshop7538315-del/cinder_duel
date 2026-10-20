@@ -135,11 +135,29 @@ export const CATACOMBS: Record<string, CatacombDef> = {
       item('oath_cleaver', 3), item('oath_seal', 3), card('bloodfeast', 3),
     ],
   },
+  cult: {
+    name: '邪教徒の地下墓',
+    blurb: '底を神と崇める邪教徒の巣。知力で唱える、捨てて使う祈祷が眠る。',
+    // 煤けた地下墓より奥。敵は自分より強い
+    levelOffset: { enemy: 2, boss: 5 },
+    enemies: [
+      { name: '邪教徒', classId: 'prophet', focus: { vit: 2, int: 3, dex: 1, att: 1 }, equip: { right: 'ritual_dagger', left: 'cult_seal', ...sage } },
+      { name: '淵の狂信者', classId: 'hero', focus: { vit: 3, str: 3, int: 2, end: 1 }, equip: { right: 'battleaxe', left: 'cult_seal', ...travel, chest: 'iron_armor' }, elite: true, behavior: BEHAVIORS.zealot },
+    ],
+    boss: { name: '淵の大司祭', classId: 'astrologer', focus: { vit: 3, int: 5, att: 2, dex: 1 }, equip: { right: 'ritual_dagger', left: 'cult_seal', ...sage }, behavior: BEHAVIORS.archpriest },
+    loot: [
+      card('abyss_offering', 1), card('abyss_whisper', 1), card('flask', 1), item('sage_hood', 1),
+      item('cult_seal', 2), item('ritual_dagger', 2), card('abyss_whisper', 2), card('sinking_prayer', 2), card('abyss_offering', 2),
+      card('bottomless_craving', 3), card('black_tide', 3), card('sinking_prayer', 3),
+    ],
+  },
 };
 
 /** シードから地下墓を選ぶときの並び。新しい地下墓は末尾に足す
  *  （数が変わると、同じシードで行ける地下墓も変わる） */
 export const CATACOMB_ORDER = ['knight', 'warrior', 'samurai', 'sorcerer', 'cleric', 'blood'];
+/** 第3版のシードからの並び（邪教徒の地下墓が増えた）。第1・2版は CATACOMB_ORDER のまま */
+export const CATACOMB_ORDER_V3 = [...CATACOMB_ORDER, 'cult'];
 
 /** 地下墓の数値 */
 export const DUNGEON = {

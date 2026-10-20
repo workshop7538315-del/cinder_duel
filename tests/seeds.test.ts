@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import fixture from './fixtures/seeds-v1.json';
 import fixtureV2 from './fixtures/seeds-v2.json';
+import fixtureV3 from './fixtures/seeds-v3.json';
 import { charLevel } from '../src/character/model';
 import { FIXED_CATACOMBS } from '../src/data/fixed';
 import {
@@ -9,12 +10,12 @@ import {
 } from '../src/dungeon/generate';
 
 /**
- * 第1版・第2版のシードが、更新しても同じ地下墓・間取り・敵・宝になることを確かめる。
+ * 第1版・第2版・第3版のシードが、更新しても同じ地下墓・間取り・敵・宝になることを確かめる。
  * このテストが落ちたら、第1版の生成（またはその表）を変えてしまっている。
  * 生成を変えたいときは、第1版を残したまま第2版を足すこと（src/dungeon/generate.ts の GENERATORS）。
  * 敵のレベル・HP・ソウル量などの数値調整は、ここでは見ていない（変えてよい）。
  */
-describe.each([['第1版', fixture], ['第2版', fixtureV2]] as const)('シードを守る（%s）', (_v, fx) => {
+describe.each([['第1版', fixture], ['第2版', fixtureV2], ['第3版', fixtureV3]] as const)('シードを守る（%s）', (_v, fx) => {
   it.each(fx.map((f) => [f.seed, f]))('%s', (_seed, f) => {
     const d = generateDungeon(f.seed, 30);
     expect(d.catacombId).toBe(f.catacombId);
@@ -102,7 +103,7 @@ describe('第2版のシード', () => {
       expect(rebuildDungeon(d.catacombId, d.seed, 30)).toEqual(d);
     }
   });
-  it('新しく用意するシードは第2版', () => {
-    expect(seedVersion(versionedSeed('x'))).toBe(2);
+  it('新しく用意するシードは第3版（邪教徒の地下墓が増えた）', () => {
+    expect(seedVersion(versionedSeed('x'))).toBe(3);
   });
 });

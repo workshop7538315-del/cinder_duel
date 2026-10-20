@@ -16,6 +16,7 @@ export function accessoryText(a: Accessory): string {
   if (e.guardDiscount) parts.push(`ガード消費-${e.guardDiscount}`);
   if (e.healPct) parts.push(`回復量+${pct(e.healPct)}`);
   if (e.bleedPct) parts.push(`与える出血+${pct(e.bleedPct)}`);
+  if (e.spellPct) parts.push(`魔術・祈祷の威力+${pct(e.spellPct)}`);
   return parts.join('・');
 }
 
@@ -43,6 +44,9 @@ export const ACCESSORIES: Record<string, Accessory> = {
   // 血盟騎士の地下墓
   blood_ring: { name: '血の指輪', kind: '指輪', weight: 0.5, effect: { stats: { arc: 5 } } },
   claw_talisman: { name: '血爪のタリスマン', kind: 'タリスマン', weight: 0.6, effect: { bleedPct: 0.25 } },
+  // 邪教徒の地下墓
+  cult_talisman: { name: '邪教のタリスマン', kind: 'タリスマン', weight: 0.6, effect: { spellPct: 0.12 } },
+  abyss_eye_ring: { name: '淵視の指輪', kind: '指輪', weight: 0.5, effect: { stats: { int: 3, fai: 3 } } },
 };
 
 /** 地下墓ごとに出るアクセサリ（2周目以降） */
@@ -53,4 +57,5 @@ export const CATACOMB_ACCESSORIES: Record<string, string[]> = {
   sorcerer: ['star_ring', 'mind_talisman'],
   cleric: ['prayer_ring', 'blessing_talisman'],
   blood: ['blood_ring', 'claw_talisman'],
+  cult: ['cult_talisman', 'abyss_eye_ring'],
 };

@@ -232,6 +232,80 @@ export const CARDS: Record<string, CardDef> = {
     run: () => {},
   },
 
+  // ---- 邪教の祈祷（底を信仰する邪教。知力で使い、使うときに手札を捨てる。自分が捨てられても発動する） ----
+  abyss_offering: {
+    name: '淵への供物', kind: '祈祷', role: 'utility', school: 'incant', cost: { t: 'face', f: [1] }, fp: 1, req: { int: 12 },
+    discard: { min: 1, max: 2 },
+    text: () => '手札を1〜2枚捨てる。捨てた枚数×2のFPを回復し、カードを1枚引く。【捨てられると】HPを最大HPの8%回復する。',
+    onDiscard: {
+      text: 'HPを最大HPの8%回復',
+      run: (b, f) => b.heal(f, Math.round(f.maxHp * 0.08)),
+    },
+    run: (b, f, _o, ctx) => {
+      const before = f.fp;
+      f.fp = Math.min(f.maxFp, f.fp + ctx.discarded * 2);
+      const got = b.draw(f);
+      b.log(`FPが${f.fp - before}戻った。${got ? `「${CARDS[got].name}」を引いた。` : ''}`, b.side(f));
+    },
+  },
+  abyss_whisper: {
+    name: '淵の囁き', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 2 }, fp: 2, req: { int: 14 },
+    discard: { min: 1, max: 1 },
+    text: (f) => `手札を1枚捨てる。魔力${num(spell(f, 'incant', 4, 0.6), '4+聖印×0.6')}＋捨てた枚数×5の攻撃。【捨てられると】相手に魔力5（リアクションできない）。`,
+    onDiscard: {
+      text: '相手に魔力5（リアクション不可）',
+      run: (b, f, o) => b.strike(f, o, { label: '淵の囁き（残響）', dmg: 5, type: 'magic', noReaction: true }),
+    },
+    run: (b, f, o, ctx) =>
+      b.strike(f, o, { label: '淵の囁き', dmg: (spell(f, 'incant', 4, 0.6) ?? 0) + ctx.discarded * 5, type: 'magic' }),
+  },
+  sinking_prayer: {
+    name: '沈む祈り', kind: '祈祷', role: 'heal', school: 'incant', cost: { t: 'face', f: [2, 4, 6] }, fp: 3, req: { int: 18 },
+    discard: { min: 1, max: 2 },
+    text: (f) => `手札を1〜2枚捨て、捨てた枚数＋1枚引く。HPを（${num(spell(f, 'incant', 4, 0.3), '4+聖印×0.3')}）×捨てた枚数回復する。【捨てられると】FPを3回復する。`,
+    onDiscard: {
+      text: 'FP3回復',
+      run: (b, f) => {
+        const before = f.fp;
+        f.fp = Math.min(f.maxFp, f.fp + 3);
+        b.log(`FPが${f.fp - before}戻った。`, b.side(f));
+      },
+    },
+    run: (b, f, _o, ctx) => {
+      const got = Array.from({ length: ctx.discarded + 1 }, () => b.draw(f)).filter(Boolean).length;
+      b.log(`カードを${got}枚引いた。`, b.side(f));
+      if (ctx.discarded) b.heal(f, (spell(f, 'incant', 4, 0.3) ?? 0) * ctx.discarded);
+    },
+  },
+  bottomless_craving: {
+    name: '底なしの渇望', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 4 }, fp: 4, req: { int: 22 },
+    discard: { min: 1, max: 3 },
+    text: (f) => `手札を1〜3枚捨てる。魔力${num(spell(f, 'incant', 6, 0.8), '6+聖印×0.8')}＋捨てた枚数×5の攻撃。当たると呪死が捨てた枚数×2溜まる。【捨てられると】相手に呪死3（リアクションできない）。`,
+    onDiscard: {
+      text: '相手に呪死3（リアクション不可）',
+      run: (b, f, o) => b.strike(f, o, { label: '渇望の残滓', dmg: 1, type: 'magic', noReaction: true, curse: 3 }),
+    },
+    run: (b, f, o, ctx) =>
+      b.strike(f, o, {
+        label: '底なしの渇望', dmg: (spell(f, 'incant', 6, 0.8) ?? 0) + ctx.discarded * 5, type: 'magic', curse: ctx.discarded * 2,
+      }),
+  },
+  black_tide: {
+    name: '黒い潮', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 5 }, fp: 5, req: { int: 26 },
+    discard: { min: 2, max: 2 },
+    text: (f) => `手札を2枚捨てる。ガードできない魔力${num(spell(f, 'incant', 10, 1), '10+聖印')}＋捨てた枚数×4の攻撃。【捨てられると】スタミナダイス+1（上限まで）。`,
+    onDiscard: {
+      text: 'スタミナダイス+1',
+      run: (b, f) => {
+        const before = f.stamina;
+        f.stamina = Math.min(f.stMax, f.stamina + 1);
+        b.log(`スタミナダイス+${f.stamina - before}。`, b.side(f));
+      },
+    },
+    run: (b, f, o, ctx) =>
+      b.strike(f, o, { label: '黒い潮', dmg: (spell(f, 'incant', 10, 1) ?? 0) + ctx.discarded * 4, type: 'magic', unguardable: true }),
+  },
+
   breath: {
     name: '深呼吸', kind: '技', role: 'utility', cost: { t: 'face', f: [6] },
     text: () => 'スタミナダイス+2（上限まで）。',
@@ -272,5 +346,6 @@ export const weaponHit = (f: Fighter, s: Scaling) => weaponDamage(f, s) + (f.buf
 export const AUTO_DECK_PRIORITY: [string, number][] = [
   ['flask', 3], ['heavyarrow', 2], ['arrow', 3], ['bloodfeast', 2], ['bloodclaw', 3], ['bloodoath', 2],
   ['spear', 3], ['mend', 2], ['blessing', 2],
+  ['abyss_whisper', 3], ['bottomless_craving', 2], ['abyss_offering', 2], ['sinking_prayer', 1],
   ['bloodblade', 2], ['tackle', 2], ['knife', 2], ['kick', 2], ['oil', 2], ['stance', 1], ['breath', 1], ['insight', 1],
 ];
