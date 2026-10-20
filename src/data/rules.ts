@@ -38,6 +38,24 @@ export const RULES = {
   drawCost: 1, // ドローに払うスタミナダイス
   handStart: 4,
 
+  // 体幹。尽きると「よろめき」: 次の自分の手番は動けず、それまでリアクションもできず、受けるダメージが増える
+  // 体幹の上限 = poiseBase + 持久 × poisePerEnd + レベル × poisePerLevel（強敵・主は別の式）
+  poiseBase: 8,
+  poisePerEnd: 0.3,
+  poisePerLevel: 0.1,
+  /** 強敵・主の体幹の上限 = base + レベル × perLevel */
+  elitePoise: { base: 20, perLevel: 0.3 },
+  bossPoise: { base: 40, perLevel: 0.7 },
+  /** ガードで受けたとき、受けるはずだったダメージ × この割合だけ体幹が減る（プレイヤーと通常の敵はガードでだけ減る） */
+  poiseGuardRate: 0.35,
+  /** 強敵・主は、攻撃を受けても体幹が減る（ダメージ × この割合） */
+  poiseHitRate: 0.4,
+  /** 溜めているあいだの強敵・主は、体幹がこの倍率で減りやすい */
+  poiseChargeMult: 1.5,
+  /** ラウンドの初めに戻る体幹（上限に対する割合） */
+  poiseRegen: 0.25,
+  /** よろめいている相手に与えるダメージの倍率 */
+  staggerDamageMult: 1.5,
   // 回避のコスト = 重さの区分の値 + 追加。追加は、受けるはずのダメージが「幅」を1つ超えるごとに+1（最大 dodgeExtraMax）。
   // 幅 = dodgeBandBase + 自分のレベル × dodgeBandPerLevel（レベルが上がるとダメージも上がるので、幅も広がる）
   dodgeBandBase: 14,

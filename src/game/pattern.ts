@@ -26,6 +26,22 @@ export function autoBehavior(lo: Pick<Loadout, 'right' | 'left' | 'weightClass'>
   };
 }
 
+/** 主の第二形態を書いていなければ、自動で足す（攻撃が強まり、溜めの大技が加わる） */
+export function withAutoPhase2(b: Behavior): Behavior {
+  if (b.phase2) return b;
+  return {
+    ...b,
+    phase2: {
+      at: AUTO_BEHAVIOR.phase2At, mode: 'random',
+      moves: [
+        ...b.moves.map((m) => (m.use ? { ...m, mult: (m.mult ?? 1) * AUTO_BEHAVIOR.phase2Mult, weight: m.weight ?? 1 } : m)),
+        { name: '渾身の一撃', use: 'weapon', mult: AUTO_BEHAVIOR.chargeMult, charge: true, unguardable: true,
+          dodgeExtra: AUTO_BEHAVIOR.chargeDodgeExtra, weight: AUTO_BEHAVIOR.chargeWeight },
+      ],
+    },
+  };
+}
+
 /** 次の行動を決める（cycle は順番、random は重み） */
 export function pickNext(b: Behavior, current: number): number {
   if (b.mode === 'cycle') return (current + 1) % b.moves.length;
@@ -39,13 +55,41 @@ export function pickNext(b: Behavior, current: number): number {
 export const firstMove = (b: Behavior): number => (b.mode === 'cycle' ? 0 : pickNext(b, -1));
 
 /** 予告する次の行動の名前 */
-export const nextMoveName = (f: Fighter): string | null => (f.pattern ? f.pattern.behavior.moves[f.pattern.next]?.name ?? null : null);
+export function nextMoveName(f: Fighter): string | null {
+  if (!f.pattern) return null;
+  const m = f.pattern.behavior.moves[f.pattern.next];
+  if (!m) return null;
+  return f.pattern.charging ? `${m.name}（溜め中・次の手番に放つ）` : m.charge ? `${m.name}の構え` : m.name;
+}
+
+/** 主: HPが減ったら第二形態に入る（行動表が変わり、体幹が戻る） */
+export function enterPhase2IfNeeded(b: Battle, e: Fighter): void {
+  const st = e.pattern!;
+  const p2 = st.behavior.phase2;
+  if (!p2 || st.phased || e.hp > e.maxHp * p2.at) return;
+  st.phased = true;
+  st.charging = false;
+  st.guarding = false;
+  st.behavior = { ...st.behavior, mode: p2.mode ?? st.behavior.mode, moves: p2.moves, phase2: undefined };
+  st.next = firstMove(st.behavior);
+  e.poise = e.maxPoise;
+  b.log(p2.text ?? `${e.name}の様子が変わった……！`, 'round');
+}
 
 /** 強敵・主の手番。予告していた行動をして、次の行動を決める */
 export async function patternTurn(b: Battle, e: Fighter, p: Fighter): Promise<void> {
   const st = e.pattern!;
   const m = st.behavior.moves[st.next];
   st.guarding = false;
+  // 溜める大技は、まず構えるだけ（予告）。次の手番に放つ
+  if (m.charge && !st.charging) {
+    st.charging = true;
+    b.log(`${e.name}は「${m.name}」の構えに入った！ 次の手番に放ってくる。`, 'foe');
+    b.update();
+    await b.wait(700);
+    return;
+  }
+  st.charging = false;
   b.log(`${e.name}の手番。「${m.name}」`, 'foe');
   b.update();
   await b.wait(700);
@@ -68,6 +112,8 @@ export async function patternTurn(b: Battle, e: Fighter, p: Fighter): Promise<vo
         bleed: weaponBleed(e, src ? src.bleed : e.right.bleed),
         curse: src ? src.curse : e.right.curse,
         drain: src?.drain,
+        dodgeExtra: m.dodgeExtra,
+        poiseMult: m.poiseMult,
       });
       await b.wait(250);
     }

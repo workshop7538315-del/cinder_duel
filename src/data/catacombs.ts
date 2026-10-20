@@ -56,7 +56,7 @@ export const CATACOMBS: Record<string, CatacombDef> = {
       { name: '煤けた騎士', classId: 'vagabond', focus: { vit: 3, str: 2, dex: 2, end: 1 }, equip: { right: 'longsword', left: 'heater', ...knight }, elite: true, behavior: BEHAVIORS.knight },
       { name: '煤けた従士', classId: 'hero', focus: { vit: 3, str: 3, end: 1 }, equip: { right: 'battleaxe', left: 'buckler', ...travel, chest: 'knight_armor' } },
     ],
-    boss: { name: '煤けた騎士長', classId: 'vagabond', focus: { vit: 3, str: 4, dex: 1, end: 2 }, equip: { right: 'halberd', left: 'heater', ...knight } },
+    boss: { name: '煤けた騎士長', classId: 'vagabond', focus: { vit: 3, str: 4, dex: 1, end: 2 }, equip: { right: 'halberd', left: 'heater', ...knight }, behavior: BEHAVIORS.knightCaptain },
     loot: [
       card('kick', 1), card('stance', 1), card('flask', 1), item('knight_helm', 1), item('knight_gauntlets', 1), item('buckler', 1),
       item('longsword', 2), item('heater', 2), item('knight_armor', 2), item('knight_greaves', 2), card('oil', 2),
@@ -171,9 +171,9 @@ export const DUNGEON = {
   fixedAboveBoss: 5,
   /** 敵の最大HPの倍率（部屋をまたいでHPを持ち越すので、道中の敵は控えめ） */
   enemyHpRatio: 0.5,
-  bossHpRatio: 1,
+  bossHpRatio: 1.6,
   /** 途中の階層の主（そのあとに篝火があるので、地下墓の主より控えめ） */
-  floorBossHpRatio: 0.75,
+  floorBossHpRatio: 1.1,
   /** ソウル = base + 敵のレベル × perLevel（主は ×bossMult） */
   soulsBase: 40,
   soulsPerLevel: 10,

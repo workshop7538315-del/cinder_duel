@@ -128,6 +128,12 @@ export interface PatternMove {
   heal?: number;
   /** カードの効果を使う（魔術・祈祷など。スタミナもFPも払わない） */
   card?: string;
+  /** 1手番かけて溜めてから放つ大技（溜めている手番は予告だけで動かない） */
+  charge?: boolean;
+  /** この攻撃への回避のコストを増やす */
+  dodgeExtra?: number;
+  /** 体幹を削る量の倍率（既定1） */
+  poiseMult?: number;
   /** random のときの選ばれやすさ（既定1） */
   weight?: number;
 }
@@ -140,6 +146,8 @@ export interface Behavior {
   /** 攻撃されたときに回避する確率・ガードする確率（その敵次第） */
   dodge: number;
   guard: number;
+  /** 第二形態。HPが at（割合）以下になると、行動表がこれに変わる（主） */
+  phase2?: { at: number; mode?: 'cycle' | 'random'; moves: PatternMove[]; text?: string };
 }
 
 /** 淵結晶（底の武器にはめる）で強める・弱めるもの */
@@ -254,7 +262,18 @@ export interface Fighter {
   /** アクセサリによる戦闘中の効果 */
   acc?: Mods;
   /** 強敵・主: 行動パターンと、次にする行動（予告）。あるとスタミナも手札も使わない */
-  pattern?: { behavior: Behavior; next: number; guarding?: boolean; rank: '強敵' | '主' };
+  pattern?: {
+    behavior: Behavior; next: number; guarding?: boolean; rank: '強敵' | '主';
+    /** 溜め中（次の手番で大技を放つ） */
+    charging?: boolean;
+    /** 第二形態に入った */
+    phased?: boolean;
+  };
+  /** 体幹（尽きるとよろめく） */
+  poise: number;
+  maxPoise: number;
+  /** よろめいている（次の自分の手番は動けない。それまでリアクションもできない） */
+  staggered?: boolean;
   buffs: Buffs;
 }
 
@@ -274,4 +293,8 @@ export interface Attack {
   /** 反撃など、受け手がリアクションできない攻撃 */
   noReaction?: boolean;
   onHit?: (target: Fighter) => void;
+  /** 回避のコストを増やす（主の大技など） */
+  dodgeExtra?: number;
+  /** 体幹を削る量の倍率 */
+  poiseMult?: number;
 }
