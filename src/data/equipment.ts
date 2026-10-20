@@ -288,6 +288,8 @@ export const ARMORS: Record<string, Armor> = {
   travel_boots: { slot: 'legs', name: '旅人の脚絆', weight: 1.5, cut: cut(0.02, 0.01, 0.01) },
 
   sage_hood: { slot: 'head', name: '賢者の帽子', weight: 1, cut: cut(0.01, 0.04, 0.03) },
+  // 邪教徒の地下墓の主・途中の主・宝箱がまれに落とす
+  cult_hood: { slot: 'head', name: '邪教のフード', weight: 1.5, cut: cut(0.02, 0.05, 0.02), effect: { drawOnDiscard: 1 } },
   sage_robe: { slot: 'chest', name: '賢者のローブ', weight: 3.5, cut: cut(0.03, 0.08, 0.06) },
   sage_trousers: { slot: 'legs', name: '賢者の下衣', weight: 1.5, cut: cut(0.01, 0.03, 0.02) },
 

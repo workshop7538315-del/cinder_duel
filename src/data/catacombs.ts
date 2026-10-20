@@ -30,6 +30,8 @@ export interface CatacombDef {
   enemies: EnemyDef[];
   boss: EnemyDef;
   loot: LootDef[];
+  /** 宝の表とは別に、まれに落とすもの（地下墓の主・途中の主・宝箱ごとの確率）。別の乱数で決める */
+  bonusDrops?: { loot: LootDef; boss: number; floorBoss: number; chest: number }[];
   /** 敵のレベルの補正（自分のレベルとの差）。書かなければ DUNGEON の値（自分より低い） */
   levelOffset?: { enemy: number; boss: number };
 }
@@ -140,6 +142,7 @@ export const CATACOMBS: Record<string, CatacombDef> = {
     blurb: '底を神と崇める邪教徒の巣。知力で唱える、捨てて使う祈祷が眠る。',
     // 煤けた地下墓より奥。敵は自分より強い
     levelOffset: { enemy: 2, boss: 5 },
+    bonusDrops: [{ loot: { kind: 'item', id: 'cult_hood', tier: 3 }, boss: 0.4, floorBoss: 0.25, chest: 0.1 }],
     enemies: [
       { name: '邪教徒', classId: 'prophet', focus: { vit: 2, int: 3, dex: 1, att: 1 }, equip: { right: 'ritual_dagger', left: 'cult_seal', ...sage } },
       { name: '淵の狂信者', classId: 'hero', focus: { vit: 3, str: 3, int: 2, end: 1 }, equip: { right: 'battleaxe', left: 'cult_seal', ...travel, chest: 'iron_armor' }, elite: true, behavior: BEHAVIORS.zealot },

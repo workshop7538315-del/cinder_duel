@@ -84,3 +84,51 @@ describe('邪教徒の地下墓', () => {
     expect(dmg[1] - dmg[0]).toBe(10);
   });
 });
+
+describe('ランダムに捨てる・邪教のフード', () => {
+  const setup = (hood: boolean, count: number) => {
+    const c = cultist();
+    if (hood) { c.inventory.items.push('cult_hood'); c.equip.head = 'cult_hood'; }
+    const p = makeFighter(c, true);
+    const e = makeFighter(newCharacter('wretch'), false);
+    let asked = 0;
+    const b = new Battle(p, e, {
+      ...io, askReactDice: async () => 0,
+      askDiscard: async () => { throw new Error('選ばせない'); },
+      askDiscardCount: async (min: number, max: number) => { asked++; expect([min, max]).toEqual([1, 3]); return count; },
+    } as unknown as BattleIO);
+    return { b, p, e, asked: () => asked };
+  };
+  it('枚数だけ選び、捨てるカードは手札からランダム', async () => {
+    const { b, p, e, asked } = setup(false, 2);
+    p.hand = ['bottomless_craving', 'kick', 'stance', 'breath', 'oil'];
+    p.deck = [];
+    p.action = [{ id: 1, v: 6 }];
+    p.fp = 30;
+    await b.playCard(p, e, 0, [p.action[0]]);
+    expect(asked()).toBe(1);
+    expect(p.hand).toHaveLength(2);
+    expect(p.discard.filter((id) => id !== 'bottomless_craving')).toHaveLength(2);
+  });
+  it('邪教のフード: カードの効果で手札を捨てたら1枚引く', async () => {
+    expect(loadout({ ...cultist(), equip: { ...cultist().equip, head: 'cult_hood' } }).acc.drawOnDiscard).toBe(1);
+    const { b, p, e } = setup(true, 2);
+    p.hand = ['bottomless_craving', 'kick', 'stance', 'breath', 'oil'];
+    p.deck = ['insight', 'insight'];
+    p.action = [{ id: 1, v: 6 }];
+    p.fp = 30;
+    await b.playCard(p, e, 0, [p.action[0]]);
+    expect(p.hand).toHaveLength(3);
+    expect(p.hand).toContain('insight');
+  });
+  it('邪教徒の地下墓では、邪教のフードがまれに手に入る', () => {
+    let found = 0;
+    for (let i = 0; i < 60; i++) {
+      const d = buildCatacomb('cult', `h${i}`, 40);
+      if (d.floors.flat().some((r) => r.bonus?.id === 'cult_hood')) found++;
+      // ほかの地下墓では出ない
+      expect(buildCatacomb('knight', `h${i}`, 40).floors.flat().some((r) => r.bonus)).toBe(false);
+    }
+    expect(found).toBeGreaterThan(10);
+  });
+});

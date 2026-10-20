@@ -110,6 +110,8 @@ export interface Armor {
   weight: number;
   /** 被ダメージのカット率（部位の合計を使う） */
   cut: Cut;
+  /** 付帯効果 */
+  effect?: { drawOnDiscard?: number };
 }
 
 /** 強敵・主の行動ひとつ */
@@ -179,6 +181,8 @@ export interface Mods {
   /** 武器が当たったときに足す出血・呪死 */
   bleedAdd: number;
   curseAdd: number;
+  /** カードの効果で手札を捨てたとき、引く枚数（邪教のフードなど） */
+  drawOnDiscard?: number;
 }
 
 /** アクセサリの効果 */

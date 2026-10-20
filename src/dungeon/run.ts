@@ -102,8 +102,8 @@ function gain(run: RunState, room: Room, souls: boolean): RunState {
   return {
     ...run,
     souls: run.souls + (souls ? room.souls : 0),
-    loot: first ? [...run.loot, ...[room.loot, room.extra].filter((l): l is LootDef => !!l).map((l) => ({ ...l, floor: run.floor }))] : run.loot,
-    looted: first && (room.loot || room.extra || room.kind === 'chest') ? [...(run.looted ?? []), roomKey(run)] : run.looted ?? [],
+    loot: first ? [...run.loot, ...[room.loot, room.extra, room.bonus].filter((l): l is LootDef => !!l).map((l) => ({ ...l, floor: run.floor }))] : run.loot,
+    looted: first && (room.loot || room.extra || room.bonus || room.kind === 'chest') ? [...(run.looted ?? []), roomKey(run)] : run.looted ?? [],
   };
 }
 

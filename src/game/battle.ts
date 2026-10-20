@@ -1,7 +1,7 @@
 import { CARDS } from '../data/cards';
 import { RULES } from '../data/rules';
 import { findPayment, isValidPayment, stageCost } from '../engine/cost';
-import { rollDice, rollMany } from '../engine/dice';
+import { rollDice, rollMany, shuffle } from '../engine/dice';
 import {
   addBleed, addCurse, applyArmor, catalystFor, dodgeCost, drawCard, enchantBleed, enchantBonus, guardCost, guardCut, spend,
   weaponBleed, weaponDamage,
@@ -51,6 +51,8 @@ export interface BattleIO {
   askReactChoice(hit: IncomingHit, dice: Die[], canDodge: boolean, canGuard: boolean, canArt: boolean): Promise<Reaction>;
   /** 手札から捨てるカードを選ぶ（hand の添字を返す） */
   askDiscard(hand: string[], min: number, max: number, cardName: string): Promise<number[]>;
+  /** ランダムに捨てるカードで、捨てる枚数を選ぶ（min〜max） */
+  askDiscardCount(min: number, max: number, cardName: string): Promise<number>;
   /** 反撃の好機に追加で振る個数（-1 = 見送る。ためてある出目 pool も使える） */
   askCounter(info: CounterInfo, max: number, pool: Die[]): Promise<number>;
   finished(playerWon: boolean): void;
@@ -344,16 +346,24 @@ export class Battle {
     this.update();
     const isAttack = c.role === 'attack';
     if (isAttack) await this.afterAction(f, true);
-    const discarded = c.discard ? await this.discardFor(f, o, c.discard.min, c.discard.max, c.name) : 0;
+    const discarded = c.discard ? await this.discardFor(f, o, c.discard.min, c.discard.max, c.name, c.discard.random) : 0;
     if (!this.over) await c.run(this, f, o, { discarded });
     if (!isAttack) await this.afterAction(f, false);
   }
 
   /** 手札から選んで捨てる。捨てられて発動するカードはここで発動する。捨てた枚数を返す */
-  private async discardFor(f: Fighter, o: Fighter, min: number, max: number, name: string): Promise<number> {
+  private async discardFor(f: Fighter, o: Fighter, min: number, max: number, name: string, random = false): Promise<number> {
     const n = Math.min(max, f.hand.length);
     if (n < min) return 0;
-    const picks = f.isPlayer ? await this.io.askDiscard([...f.hand], min, n, name) : npcDiscards(f.hand, min, n);
+    let picks: number[];
+    if (random) {
+      // 枚数だけ決めて（決まっていればそのまま）、捨てるカードは手札からランダム
+      let k = min === n ? n : f.isPlayer ? await this.io.askDiscardCount(min, n, name) : n;
+      k = Math.max(min, Math.min(n, k));
+      picks = shuffle(f.hand.map((_, i) => i)).slice(0, k);
+    } else {
+      picks = f.isPlayer ? await this.io.askDiscard([...f.hand], min, n, name) : npcDiscards(f.hand, min, n);
+    }
     const ids = [...new Set(picks)].filter((i) => i >= 0 && i < f.hand.length).slice(0, n).map((i) => f.hand[i]);
     for (const id of ids) {
       f.hand.splice(f.hand.indexOf(id), 1);
@@ -368,6 +378,13 @@ export class Battle {
         await tr.run(this, f, o);
       }
     }
+    // 邪教のフードなど: 捨てたら引く
+    const extra = ids.length ? f.acc?.drawOnDiscard ?? 0 : 0;
+    for (let i = 0; i < extra && !this.over; i++) {
+      const got = drawCard(f);
+      if (got) this.log(`${this.who(f)}は捨てた代わりに${f.isPlayer ? `「${CARDS[got].name}」を` : 'カードを1枚'}引いた。`, this.side(f));
+    }
+    if (extra) this.update();
     return ids.length;
   }
 
