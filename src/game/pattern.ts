@@ -70,7 +70,7 @@ export function enterPhase2IfNeeded(b: Battle, e: Fighter): void {
   st.phased = true;
   st.charging = false;
   st.guarding = false;
-  st.behavior = { ...st.behavior, mode: p2.mode ?? st.behavior.mode, moves: p2.moves, phase2: undefined };
+  st.behavior = { ...st.behavior, mode: p2.mode ?? st.behavior.mode, moves: p2.moves, aura: p2.aura ?? st.behavior.aura, phase2: undefined };
   st.next = firstMove(st.behavior);
   e.poise = e.maxPoise;
   b.log(p2.text ?? `${e.name}の様子が変わった……！`, 'round');

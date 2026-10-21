@@ -50,6 +50,7 @@ function panelHTML(b: Battle, f: Fighter): string {
   if (f.pattern?.guarding) chips.push(`<span class="chip buff">守りを固めている</span>`);
   if (f.pattern?.charging) chips.push(`<span class="chip debuff">溜め中（崩れやすい）</span>`);
   if (f.pattern?.phased) chips.push(`<span class="chip rank">第二形態</span>`);
+  if (f.pattern?.behavior.aura) chips.push(`<span class="chip debuff" title="${esc(f.pattern.behavior.aura.text)}">${esc(f.pattern.behavior.aura.name)}：${esc(f.pattern.behavior.aura.text)}</span>`);
   if (f.staggered) chips.push(`<span class="chip debuff">よろめき</span>`);
   if (f.buffs.stance) chips.push(`<span class="chip buff">構え</span>`);
   const en = f.buffs.enchant;

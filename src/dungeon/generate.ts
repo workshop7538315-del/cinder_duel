@@ -425,7 +425,13 @@ export function buildCatacomb(catacombId: string, seed: string, level: number): 
     const chance = room.kind === 'chest' ? FIXED.clueChestChance : room.kind === 'boss' ? FIXED.clueBossChance : 0;
     if (!chance) return;
     const cr = seededRng(`clue:${catacombId}:${seed}:${fi}:${ri}`);
-    if (cr() < chance) room.clue = pick(cr, Object.keys(FIXED_CATACOMBS));
+    // どこでも見つかる手がかり（最初からある困難な地下墓）。ここに足すと既存のシードの手がかりが変わるので、新しいものは clueFrom で足す
+    if (cr() < chance) room.clue = pick(cr, Object.keys(FIXED_CATACOMBS).filter((k) => !FIXED_CATACOMBS[k].clueFrom));
+    // 決まった地下墓でだけ見つかる手がかり（別の乱数）
+    for (const [key, f] of Object.entries(FIXED_CATACOMBS)) {
+      if (room.clue || !f.clueFrom?.includes(catacombId)) continue;
+      if (seededRng(`clue:${key}:${catacombId}:${seed}:${fi}:${ri}`)() < chance) room.clue = key;
+    }
   }));
 
   return markBosses({ catacombId, name: cat.name, rank: '通常', seed, level, floors, totalRooms, quality });

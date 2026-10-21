@@ -47,6 +47,8 @@ export const ACCESSORIES: Record<string, Accessory> = {
   // 邪教徒の地下墓
   cult_talisman: { name: '邪教のタリスマン', kind: 'タリスマン', weight: 0.6, effect: { spellPct: 0.12 } },
   abyss_eye_ring: { name: '淵視の指輪', kind: '指輪', weight: 0.5, effect: { stats: { int: 3, fai: 3 } } },
+  // 淵の神殿の主が落とす
+  abyss_heart: { name: '淵の心臓', kind: 'タリスマン', weight: 0.8, effect: { spellPct: 0.1, fp: 5 } },
 };
 
 /** 地下墓ごとに出るアクセサリ（2周目以降） */

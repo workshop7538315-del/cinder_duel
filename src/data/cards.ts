@@ -307,6 +307,19 @@ export const CARDS: Record<string, CardDef> = {
       b.strike(f, o, { label: '黒い潮', dmg: (spell(f, 'incant', 10, 1) ?? 0) + ctx.discarded * 4, type: 'magic', unguardable: true }),
   },
 
+  // 淵の神殿でだけ手に入る
+  abyss_manifest: {
+    name: '淵の顕現', kind: '祈祷', role: 'attack', school: 'incant', cost: { t: 'sum', n: 6 }, fp: 7, req: { int: 34 },
+    discard: { min: 2, max: 4, random: true },
+    text: (f) => `手札からランダムに2〜4枚捨てる。ガードできない魔力${num(spell(f, 'incant', 12, 1.2), '12+聖印×1.2')}＋捨てた枚数×6の攻撃。【捨てられると】相手の手札を1枚ランダムに捨てさせる。`,
+    onDiscard: {
+      text: '相手の手札を1枚ランダムに捨てさせる',
+      run: async (b, f, o) => { await b.forceDiscard(o, f, 1, '淵の顕現'); },
+    },
+    run: (b, f, o, ctx) =>
+      b.strike(f, o, { label: '淵の顕現', dmg: (spell(f, 'incant', 12, 1.2) ?? 0) + ctx.discarded * 6, type: 'magic', unguardable: true }),
+  },
+
   breath: {
     name: '深呼吸', kind: '技', role: 'utility', cost: { t: 'face', f: [6] },
     text: () => 'スタミナダイス+2（上限まで）。',

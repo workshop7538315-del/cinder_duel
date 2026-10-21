@@ -145,6 +145,8 @@ export class Battle {
       }
       this.log(`ラウンド ${this.round}`, 'round');
       this.update();
+      for (const f of [this.e, this.p]) if (!this.over) await this.applyAura(f, f === this.p ? this.e : this.p);
+      if (this.over) break;
       await this.drawPhase();
 
       for (const f of [this.p, this.e]) {
@@ -446,6 +448,37 @@ export class Battle {
         this.log(`${this.who(def)}はレベルを1失った。`, 'hit');
       }
       this.io.flash(def);
+    } else {
+      this.log(`${this.who(def)}に呪死が溜まった（${def.curse}/${RULES.curseThreshold}）。`);
+    }
+  }
+
+  /** 相手（target）の手札をランダムに捨てさせる（捨てられて発動するカードは target のものとして発動） */
+  async forceDiscard(target: Fighter, source: Fighter, n: number, name: string): Promise<number> {
+    const k = Math.min(n, target.hand.length);
+    if (!k) return 0;
+    return this.discardFor(target, source, k, k, name, true);
+  }
+
+  /** 主の固有の仕掛け（ラウンドの初めに相手へ働く） */
+  private async applyAura(f: Fighter, o: Fighter): Promise<void> {
+    const a = f.pattern?.behavior.aura;
+    if (!a || f.hp <= 0) return;
+    this.log(`${f.name}の「${a.name}」。`, 'foe');
+    if (a.discard) await this.forceDiscard(o, f, a.discard, a.name);
+    if (a.curse) this.curseDirect(o, a.curse);
+    this.update();
+  }
+
+  /** 攻撃によらず呪死を溜める（仕掛けなど）。溜まりきると即死 */
+  private curseDirect(def: Fighter, amount: number): void {
+    if (def.hp <= 0 || amount <= 0) return;
+    if (addCurse(def, amount)) {
+      def.hp = 0;
+      this.log(`${this.who(def)}は呪死した。`, 'hit');
+      this.io.flash(def);
+      this.update();
+      this.finish(def === this.p ? this.e : this.p);
     } else {
       this.log(`${this.who(def)}に呪死が溜まった（${def.curse}/${RULES.curseThreshold}）。`);
     }

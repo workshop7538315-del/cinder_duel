@@ -22,6 +22,8 @@ export interface FixedCatacomb {
   recommendedLevel: number;
   blurb: string;
   floors: FixedRoom[][];
+  /** この地下墓の手がかりが見つかる通常の地下墓（書かなければ、どの通常の地下墓でも見つかる） */
+  clueFrom?: string[];
 }
 
 const travel = { head: 'travel_hood', chest: 'travel_coat', arms: 'travel_gloves', legs: 'travel_boots' };
@@ -45,6 +47,13 @@ const E = {
   altarGuard: { name: '祭壇の番人', classId: 'hero', focus: { vit: 4, str: 3, arc: 3, end: 2 }, equip: { right: 'oath_cleaver', left: null, ...iron } },
   bloodPriest: { name: '血の司祭', classId: 'confessor', focus: { vit: 3, fai: 2, arc: 5, att: 2 }, equip: { right: 'oath_saber', left: 'oath_seal', ...sage } },
   bloodLord: { name: '血の君主', classId: 'confessor', focus: { vit: 5, str: 3, arc: 5, end: 3 }, equip: { right: 'oath_cleaver', left: 'oath_seal', ...iron }, behavior: BEHAVIORS.bloodLord },
+
+  templeCultist: { name: '神殿の邪教徒', classId: 'prophet', focus: { vit: 2, int: 3, dex: 1, att: 1 }, equip: { right: 'ritual_dagger', left: 'cult_seal', ...sage } },
+  templeZealot: { name: '神殿の狂信者', classId: 'hero', focus: { vit: 3, str: 3, int: 2, end: 1 }, equip: { right: 'battleaxe', left: 'cult_seal', ...travel, chest: 'iron_armor' }, elite: true, behavior: BEHAVIORS.zealot },
+  templeWarden: { name: '神殿の門番', classId: 'hero', focus: { vit: 4, str: 4, end: 2, int: 1 }, equip: { right: 'greatsword', left: 'cult_seal', ...iron } },
+  templePriest: { name: '神殿の大司祭', classId: 'astrologer', focus: { vit: 3, int: 5, att: 2, dex: 1 }, equip: { right: 'ritual_dagger', left: 'cult_seal', ...sage }, behavior: BEHAVIORS.archpriest },
+  templeBasilisk: { name: '神殿のバジリスク', classId: 'wretch', focus: { vit: 3, att: 2, end: 1, str: 1, arc: 1 }, equip: { right: 'basilisk_maw', left: null, head: null, chest: null, arms: null, legs: null } },
+  abyssSpawn: { name: '淵より来るもの', classId: 'wretch', focus: { vit: 6, int: 4, arc: 3, str: 2, att: 2 }, equip: { right: 'abyss_tendril', left: null, head: null, chest: null, arms: null, legs: null }, behavior: BEHAVIORS.abyssSpawn },
 } satisfies Record<string, EnemyDef>;
 
 export const FIXED_CATACOMBS: Record<string, FixedCatacomb> = {
@@ -94,6 +103,36 @@ export const FIXED_CATACOMBS: Record<string, FixedCatacomb> = {
         { kind: 'battle', enemy: E.bloodPriest, level: 62, hpRatio: 0.7, souls: 1700 },
         { kind: 'chest', souls: 4000 },
         { kind: 'boss', enemy: E.bloodLord, level: 68, hpRatio: 1, souls: 12000, loot: item('oath_seal') },
+      ],
+    ],
+  },
+  abyss_temple: {
+    name: '淵の神殿',
+    seed: 'abyss-temple',
+    rank: '困難',
+    recommendedLevel: 70,
+    blurb: '邪教徒たちが「底の神」を祀る神殿。最奥で、淵そのものが口を開けている。',
+    // 手がかりは邪教徒の地下墓でだけ見つかる
+    clueFrom: ['cult'],
+    floors: [
+      [
+        { kind: 'battle', enemy: E.templeCultist, level: 66, hpRatio: 0.7, souls: 1500 },
+        { kind: 'battle', enemy: E.templeZealot, level: 68, hpRatio: 0.9, souls: 3000 },
+        { kind: 'chest', loot: card('black_tide') },
+        { kind: 'boss', enemy: E.templeWarden, level: 72, hpRatio: 1.1, souls: 6000, loot: item('cult_hood') },
+        { kind: 'bonfire' },
+      ],
+      [
+        { kind: 'battle', enemy: E.templeBasilisk, level: 70, hpRatio: 0.7, souls: 800 },
+        { kind: 'battle', enemy: E.templeCultist, level: 70, hpRatio: 0.7, souls: 1800 },
+        { kind: 'chest', souls: 5000 },
+        { kind: 'boss', enemy: E.templePriest, level: 75, hpRatio: 1.6, souls: 9000, loot: card('abyss_manifest') },
+        { kind: 'bonfire' },
+      ],
+      [
+        { kind: 'battle', enemy: E.templeZealot, level: 74, hpRatio: 0.9, souls: 3500 },
+        { kind: 'chest', loot: item('abyss_great_seal') },
+        { kind: 'boss', enemy: E.abyssSpawn, level: 82, hpRatio: 2.2, souls: 20000, loot: item('abyss_heart') },
       ],
     ],
   },
