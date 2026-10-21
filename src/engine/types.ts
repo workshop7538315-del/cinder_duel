@@ -142,6 +142,17 @@ export interface PatternMove {
   weight?: number;
 }
 
+/** 主の固有の仕掛け。ラウンドの初めに相手へ働く */
+export interface Aura {
+  name: string;
+  /** 説明（敵の欄に出す） */
+  text: string;
+  /** 相手の手札をランダムに捨てさせる枚数（捨てられて発動するカードは発動する） */
+  discard?: number;
+  /** 相手に溜める呪死 */
+  curse?: number;
+}
+
 /** 強敵・主の動き方。スタミナも手札もなく、決まった順番かランダムで動く */
 export interface Behavior {
   /** cycle: moves を順番に繰り返す / random: 重みで選ぶ */
@@ -150,8 +161,10 @@ export interface Behavior {
   /** 攻撃されたときに回避する確率・ガードする確率（その敵次第） */
   dodge: number;
   guard: number;
-  /** 第二形態。HPが at（割合）以下になると、行動表がこれに変わる（主） */
-  phase2?: { at: number; mode?: 'cycle' | 'random'; moves: PatternMove[]; text?: string };
+  /** 固有の仕掛け（ラウンドの初めに働く） */
+  aura?: Aura;
+  /** 第二形態。HPが at（割合）以下になると、行動表がこれに変わる（主）。aura があれば仕掛けも変わる */
+  phase2?: { at: number; mode?: 'cycle' | 'random'; moves: PatternMove[]; text?: string; aura?: Aura };
 }
 
 /** 淵結晶（底の武器にはめる）で強める・弱めるもの */

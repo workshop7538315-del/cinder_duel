@@ -137,6 +137,16 @@ export const WEAPONS: Record<string, Weapon> = {
       dmg: { base: 16, scale: { arc: 0.4 } } },
   },
 
+  // ---- 淵より来るもの（淵の神殿の主。敵だけが使う）。触腕は祈祷の触媒も兼ねる ----
+  abyss_tendril: {
+    kind: 'weapon', school: 'incant', name: '淵の触腕', weight: 0, req: {}, natural: true, noEnchant: true,
+    first: 3, inc: 2, maxChain: 3, type: 'magic', curse: 1,
+    dmg: { base: 6, scale: { int: 0.3, arc: 0.2 } }, cut: { phys: 0.2, magic: 0.4, holy: 0.1 },
+    power: { base: 0, scale: { int: 0.6, arc: 0.3 } },
+    art: { name: '底の呼び声', cost: { t: 'sum', n: 5 }, fp: 5, type: 'magic', unguardable: true, curse: 5,
+      dmg: { base: 14, scale: { int: 0.4 } } },
+  },
+
   // ---- 触媒 ----
   novice_staff: {
     kind: 'catalyst', school: 'sorcery', name: '見習いの杖', weight: 2, req: { int: 10 },
@@ -169,6 +179,13 @@ export const WEAPONS: Record<string, Weapon> = {
     first: 3, inc: 2, maxChain: 1, type: 'phys',
     dmg: { base: 2, scale: { str: 0.1 } }, cut: { phys: 0.1, magic: 0.25, holy: 0.1 },
     power: { base: 0, scale: { int: 0.5, arc: 0.1 } },
+  },
+  // 淵の神殿でだけ手に入る、より強い邪教の聖印
+  abyss_great_seal: {
+    kind: 'catalyst', school: 'incant', name: '淵の大聖印', weight: 2, req: { int: 30, fai: 16 },
+    first: 3, inc: 2, maxChain: 1, type: 'phys',
+    dmg: { base: 3, scale: { str: 0.1 } }, cut: { phys: 0.1, magic: 0.3, holy: 0.15 },
+    power: { base: 0, scale: { int: 0.65, fai: 0.2 } },
   },
   ritual_dagger: {
     kind: 'weapon', name: '儀式の短剣', weight: 1.5, req: { dex: 10, int: 14 },

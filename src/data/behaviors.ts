@@ -77,6 +77,27 @@ export const BEHAVIORS = {
       ],
     },
   },
+  /** 淵より来るもの（淵の神殿の主）。毎ラウンド手札を引き剥がし、第二形態では呪死も溜める */
+  abyssSpawn: {
+    mode: 'cycle', dodge: 0, guard: 0,
+    aura: { name: '淵の引力', text: 'ラウンドの初めに、手札を1枚ランダムに捨てさせる', discard: 1 },
+    moves: [
+      { name: '触腕の連打', use: 'weapon', hits: 3 },
+      { name: '淵の囁き', card: 'abyss_whisper', discarded: 3 },
+      { name: '底の呼び声', use: 'art' },
+      { name: '見つめる' },
+    ],
+    phase2: {
+      at: 0.5, mode: 'random', text: '淵より来るものが裂け、底そのものが覗く。足元が沈んでいく……！',
+      aura: { name: '淵の深まり', text: 'ラウンドの初めに、手札を1枚ランダムに捨てさせ、呪死を2溜める', discard: 1, curse: 2 },
+      moves: [
+        { name: '触腕の嵐', use: 'weapon', hits: 4, mult: 1.1, weight: 3 },
+        { name: '黒い潮', card: 'black_tide', discarded: 4, weight: 2 },
+        { name: '淵の顕現', card: 'abyss_manifest', discarded: 5, charge: true, weight: 2 },
+        { name: '底の呼び声', use: 'art', weight: 2 },
+      ],
+    },
+  },
   /** 煤けた騎士長（斧槍と盾） */
   knightCaptain: {
     mode: 'cycle', dodge: 0, guard: 0.35,
